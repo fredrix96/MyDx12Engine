@@ -147,12 +147,14 @@
     <ClInclude Include="deviceManager.h" />
     <ClInclude Include="dx.h" />
     <ClInclude Include="stdafx.h" />
+    <ClInclude Include="swapChainManager.h" />
     <ClInclude Include="windowManager.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="commandQueueManager.cpp" />
     <ClCompile Include="deviceManager.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="swapChainManager.cpp" />
     <ClCompile Include="windowManager.cpp" />
   </ItemGroup>
   <ItemGroup>

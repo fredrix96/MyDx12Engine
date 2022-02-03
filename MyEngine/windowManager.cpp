@@ -55,8 +55,7 @@ bool WindowManager::initializeWindow(HINSTANCE hInstance, int showWnd)
 
 	if (!RegisterClassEx(&wc))
 	{
-		MessageBox(NULL, L"Error registering class",
-			L"Error", MB_OK | MB_ICONERROR);
+		MessageBox(NULL, L"Error registering class", L"Error", MB_OK | MB_ICONERROR);
 		return false;
 	}
 
@@ -73,8 +72,7 @@ bool WindowManager::initializeWindow(HINSTANCE hInstance, int showWnd)
 
 	if (!mHwnd)
 	{
-		MessageBox(NULL, L"Error creating window",
-			L"Error", MB_OK | MB_ICONERROR);
+		MessageBox(NULL, L"Error creating window", L"Error", MB_OK | MB_ICONERROR);
 		return false;
 	}
 
