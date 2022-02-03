@@ -23,5 +23,5 @@ public:
 
 	bool CreateDirectCommandQueue(ID3D12Device* device);
 
-	ComPtr<ID3D12CommandQueue> const GetDirectCommandQueue() const;
+	ComPtr<ID3D12CommandQueue> GetDirectCommandQueue() const;
 };

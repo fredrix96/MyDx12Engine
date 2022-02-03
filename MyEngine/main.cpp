@@ -3,14 +3,11 @@
 #include "deviceManager.h"
 #include "commandQueueManager.h"
 #include "swapChainManager.h"
+#include "descriptorManager.h"
 
 #pragma region globals
 
 // direct3d stuff
-ComPtr<ID3D12DescriptorHeap> rtvDescriptorHeap; // a descriptor heap to hold resources like the render targets
-
-ComPtr<ID3D12Resource> renderTargets[NUM_OF_FRAME_BUFFERS]; // number of render targets equal to buffer count
-
 ComPtr<ID3D12CommandAllocator> commandAllocator[NUM_OF_FRAME_BUFFERS]; // we want enough allocators for each buffer * number of threads (we only have one thread)
 
 ComPtr<ID3D12GraphicsCommandList> commandList; // a command list we can record commands into, then execute them to render the frame
@@ -23,9 +20,6 @@ HANDLE fenceEvent; // a handle to an event when our fence is unlocked by the gpu
 UINT64 fenceValue[NUM_OF_FRAME_BUFFERS]; // this value is incremented each frame. each fence will have its own value
 
 int frameIndex; // current rtv we are on
-
-int rtvDescriptorSize; // size of the rtv descriptor on the device (all front and back buffers will be the same size)
-					   // function declarations
 
 ComPtr<ID3D12PipelineState> pipelineStateObject; // pso containing a pipeline state
 
@@ -96,18 +90,19 @@ struct Vertex {
 
 void EnableDebugLayer(); // enable debug layer
 
-void mainloop(CommandQueueManager& cqm, SwapChainManager& scm); // main application loop
+void mainloop(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& descm); // main application loop
 
 bool InitD3D(WindowManager& window,
 	DeviceManager& dm,
 	CommandQueueManager& cqm,
-	SwapChainManager& scm); // initializes direct3d 12
+	SwapChainManager& scm,
+	DescriptorManager& descm); // initializes direct3d 12
 
 void Update(); // update the game logic
 
-void UpdatePipeline(SwapChainManager& scm); // update the direct3d pipeline (update command lists)
+void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm); // update the direct3d pipeline (update command lists)
 
-void Render(CommandQueueManager& cqm, SwapChainManager& scm); // execute the command list
+void Render(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& descm); // execute the command list
 
 void Cleanup(SwapChainManager& scm); // release com ojects and clean up memory
 
@@ -134,9 +129,10 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	DeviceManager dm;
 	CommandQueueManager cqm;
 	SwapChainManager scm;
+	DescriptorManager descm;
 
 	// initialize direct3d
-	if (!InitD3D(mainWindow, dm, cqm, scm))
+	if (!InitD3D(mainWindow, dm, cqm, scm, descm))
 	{
 		MessageBox(0, L"Failed to initialize direct3d 12", L"Error", MB_OK);
 		Cleanup(scm);
@@ -144,7 +140,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	}
 
 	// start the main loop
-	mainloop(cqm, scm);
+	mainloop(cqm, scm, descm);
 
 	// we want to wait for the gpu to finish executing the command list before we start releasing everything
 	WaitForPreviousFrame(scm);
@@ -158,7 +154,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	return 0;
 }
 
-void mainloop(CommandQueueManager& cqm, SwapChainManager& scm) {
+void mainloop(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& descm) {
 	MSG msg;
 	ZeroMemory(&msg, sizeof(MSG));
 
@@ -175,7 +171,7 @@ void mainloop(CommandQueueManager& cqm, SwapChainManager& scm) {
 		else {
 			// run game code
 			Update(); // update the game logic
-			Render(cqm, scm); // execute the command queue (rendering the scene is the result of the gpu executing the command lists)
+			Render(cqm, scm, descm); // execute the command queue (rendering the scene is the result of the gpu executing the command lists)
 		}
 	}
 }
@@ -183,7 +179,8 @@ void mainloop(CommandQueueManager& cqm, SwapChainManager& scm) {
 bool InitD3D(WindowManager& window,
 	DeviceManager& dm,
 	CommandQueueManager& cqm,
-	SwapChainManager& scm)
+	SwapChainManager& scm,
+	DescriptorManager& descm)
 {
 	bool isCreated = false;
 
@@ -207,52 +204,14 @@ bool InitD3D(WindowManager& window,
 
 	// -- Create the Back Buffers (render target views) Descriptor Heap -- //
 
-	// describe an rtv descriptor heap and create
-	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-	rtvHeapDesc.NumDescriptors = NUM_OF_FRAME_BUFFERS; // number of descriptors for this heap.
-	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV; // this heap is a render target view heap
-
-													   // This heap will not be directly referenced by the shaders (not shader visible), as this will store the output from the pipeline
-													   // otherwise we would set the heap's flag to D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE
-	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	HRESULT hr = dm.GetDevice()->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&rtvDescriptorHeap));
-	if (FAILED(hr))
-	{
-		return false;
-	}
-
-	// get the size of a descriptor in this heap (this is a rtv heap, so only rtv descriptors should be stored in it.
-	// descriptor sizes may vary from device to device, which is why there is no set size and we must ask the 
-	// device to give us the size. we will use this size to increment a descriptor handle offset
-	rtvDescriptorSize = dm.GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-
-	// get a handle to the first descriptor in the descriptor heap. a handle is basically a pointer,
-	// but we cannot literally use it like a c++ pointer.
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-
-	// Create a RTV for each buffer (double buffering is two buffers, tripple buffering is 3).
-	for (int i = 0; i < NUM_OF_FRAME_BUFFERS; i++)
-	{
-		// first we get the n'th buffer in the swap chain and store it in the n'th
-		// position of our ID3D12Resource array
-		hr = scm.GetSwapChain()->GetBuffer(i, IID_PPV_ARGS(&renderTargets[i]));
-		if (FAILED(hr))
-		{
-			return false;
-		}
-
-		// the we "create" a render target view which binds the swap chain buffer (ID3D12Resource[n]) to the rtv handle
-		dm.GetDevice()->CreateRenderTargetView(renderTargets[i].Get(), nullptr, rtvHandle);
-
-		// we increment the rtv handle by the rtv descriptor size we got above
-		rtvHandle.Offset(1, rtvDescriptorSize);
-	}
+	isCreated = descm.CreateRTVDescriptorHeap(dm.GetDevice().Get(), scm.GetSwapChain().Get(), L"first");
+	ASSERT(isCreated);
 
 	// -- Create the Command Allocators -- //
 
 	for (int i = 0; i < NUM_OF_FRAME_BUFFERS; i++)
 	{
-		hr = dm.GetDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator[i]));
+		HRESULT hr = dm.GetDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator[i]));
 		if (FAILED(hr))
 		{
 			return false;
@@ -262,7 +221,7 @@ bool InitD3D(WindowManager& window,
 	// -- Create a Command List -- //
 
 	// create the command list with the first allocator
-	hr = dm.GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator[frameIndex].Get(), NULL, IID_PPV_ARGS(commandList.GetAddressOf()));
+	HRESULT hr = dm.GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator[frameIndex].Get(), NULL, IID_PPV_ARGS(commandList.GetAddressOf()));
 	if (FAILED(hr))
 	{
 		return false;
@@ -808,7 +767,7 @@ void Update()
 	XMStoreFloat4x4(&cube2WorldMat, worldMat);
 }
 
-void UpdatePipeline(SwapChainManager& scm)
+void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm)
 {
 	HRESULT hr;
 
@@ -842,10 +801,11 @@ void UpdatePipeline(SwapChainManager& scm)
 	// here we start recording commands into the commandList (which all the commands will be stored in the commandAllocator)
 
 	// transition the "frameIndex" render target from the present state to the render target state so the command list draws to it starting from here
-	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTargets[frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(descm.GetRTVDescriptor(L"first").GetRenderTarget(frameIndex).Get(),
+		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 	// here we again get the handle to our current render target view so we can set it as the render target in the output merger stage of the pipeline
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), frameIndex, rtvDescriptorSize);
+	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle = descm.GetRTVDescriptor(L"first").GetHandle(frameIndex);
 
 	// get a handle to the depth/stencil buffer
 	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
@@ -890,7 +850,8 @@ void UpdatePipeline(SwapChainManager& scm)
 
 	// transition the "frameIndex" render target from the render target state to the present state. If the debug layer is enabled, you will receive a
 	// warning if present is called on the render target when it's not in the present state
-	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTargets[frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(descm.GetRTVDescriptor(L"first").GetRenderTarget(frameIndex).Get(),
+		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
 	hr = commandList->Close();
 	if (FAILED(hr))
@@ -899,11 +860,11 @@ void UpdatePipeline(SwapChainManager& scm)
 	}
 }
 
-void Render(CommandQueueManager& cqm, SwapChainManager& scm)
+void Render(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& descm)
 {
 	HRESULT hr;
 
-	UpdatePipeline(scm); // update the pipeline by sending commands to the commandqueue
+	UpdatePipeline(scm, descm); // update the pipeline by sending commands to the commandqueue
 
 	// create an array of command lists (only one command list here)
 	ComPtr<ID3D12CommandList> ppCommandLists[] = { commandList.Get() };

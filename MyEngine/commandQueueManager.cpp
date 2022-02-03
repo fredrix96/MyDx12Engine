@@ -13,7 +13,11 @@ CommandQueueManager::~CommandQueueManager()
 
 bool CommandQueueManager::CreateDirectCommandQueue(ID3D12Device* device)
 {
-	if (mDirectCommandQueue != NULL) return false;
+	if (mDirectCommandQueue != NULL)
+	{
+		ASSERT(false);
+		return false;
+	}
 
 	D3D12_COMMAND_QUEUE_DESC cqDesc = {};
 	cqDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
@@ -22,13 +26,14 @@ bool CommandQueueManager::CreateDirectCommandQueue(ID3D12Device* device)
 	mHr = device->CreateCommandQueue(&cqDesc, IID_PPV_ARGS(&mDirectCommandQueue)); // create the command queue
 	if (FAILED(mHr))
 	{
+		ASSERT(false);
 		return false;
 	}
 
 	return true;
 }
 
-ComPtr<ID3D12CommandQueue> const CommandQueueManager::GetDirectCommandQueue() const
+ComPtr<ID3D12CommandQueue> CommandQueueManager::GetDirectCommandQueue() const
 {
 	return mDirectCommandQueue;
 }

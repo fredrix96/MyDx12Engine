@@ -39,6 +39,12 @@
     <ClInclude Include="swapChainManager.h">
       <Filter>Resource Files</Filter>
     </ClInclude>
+    <ClInclude Include="descriptorManager.h">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="descriptor.h">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -54,6 +60,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="swapChainManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="descriptorManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="descriptor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

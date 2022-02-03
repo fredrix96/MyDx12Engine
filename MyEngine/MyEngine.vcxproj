@@ -144,6 +144,8 @@
   <ItemGroup>
     <ClInclude Include="commandQueueManager.h" />
     <ClInclude Include="d3dx12.h" />
+    <ClInclude Include="descriptor.h" />
+    <ClInclude Include="descriptorManager.h" />
     <ClInclude Include="deviceManager.h" />
     <ClInclude Include="dx.h" />
     <ClInclude Include="stdafx.h" />
@@ -152,6 +154,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="commandQueueManager.cpp" />
+    <ClCompile Include="descriptor.cpp" />
+    <ClCompile Include="descriptorManager.cpp" />
     <ClCompile Include="deviceManager.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="swapChainManager.cpp" />

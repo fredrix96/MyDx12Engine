@@ -15,7 +15,11 @@ bool SwapChainManager::CreateSwapChain(WindowManager& window,
 	ID3D12CommandQueue* commandQueue,
 	int frameBufferCount)
 {
-	if (mSwapChain != NULL) return false;
+	if (mSwapChain != NULL) 
+	{
+		ASSERT(false);
+		return false;
+	}
 
 	mBackBufferDesc.Width = window.GetWidth(); // buffer width
 	mBackBufferDesc.Height = window.GetHeight(); // buffer height
@@ -49,22 +53,22 @@ bool SwapChainManager::CreateSwapChain(WindowManager& window,
 	return false;
 }
 
-ComPtr<IDXGISwapChain3> const SwapChainManager::GetSwapChain() const
+ComPtr<IDXGISwapChain3> SwapChainManager::GetSwapChain() const
 {
 	return mSwapChain;
 }
 
-DXGI_MODE_DESC const SwapChainManager::GetBackBufferDesc() const
+DXGI_MODE_DESC SwapChainManager::GetBackBufferDesc() const
 {
 	return mBackBufferDesc;
 }
 
-DXGI_SAMPLE_DESC const SwapChainManager::GetSampleDesc() const
+DXGI_SAMPLE_DESC SwapChainManager::GetSampleDesc() const
 {
 	return mSampleDesc;
 }
 
-DXGI_SWAP_CHAIN_DESC const SwapChainManager::GetSwapChainDesc() const
+DXGI_SWAP_CHAIN_DESC SwapChainManager::GetSwapChainDesc() const
 {
 	return mSwapChainDesc;
 }

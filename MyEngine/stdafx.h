@@ -12,6 +12,7 @@
 #include "wrl/client.h"
 #include <string>
 #include <iostream>
+#include <map>
 
 // detect memory leaks
 #define _CRTDBG_MAP_ALLOC
@@ -23,8 +24,14 @@
 // this will only call release if an object exists (prevents exceptions calling release on non existant objects)
 #define SAFE_RELEASE(p) { if ( (p) ) { (p)->Release(); (p) = 0; } }
 
+#define DEFAULT_VALUE -1
+
 using namespace DirectX; // we will be using the directxmath library
 using namespace Microsoft::WRL; // for stuff like ComPtrs
+
+enum class DESCRIPTOR_TYPE {
+    RTV
+};
 
 #ifdef _DEBUG
 #define ASSERT(expression)                                  \

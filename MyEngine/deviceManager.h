@@ -16,6 +16,6 @@ public:
 
 	bool CreateDevice();
 
-	ComPtr<ID3D12Device> const GetDevice() const;
-	ComPtr<IDXGIFactory4> const GetFactory() const;
+	ComPtr<ID3D12Device> GetDevice() const;
+	ComPtr<IDXGIFactory4> GetFactory() const;
 };

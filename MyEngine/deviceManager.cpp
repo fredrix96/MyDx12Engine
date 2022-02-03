@@ -15,7 +15,11 @@ bool DeviceManager::CreateDevice()
 
 	mHr = CreateDXGIFactory1(IID_PPV_ARGS(&mFactory));
 
-	if (FAILED(mHr)) return false;
+	if (FAILED(mHr))
+	{
+		ASSERT(false);
+		return false;
+	}
 
 	int adapterIndex = 0; // we'll start looking for directx 12 compatible graphics devices starting at index 0
 	bool adapterFound = false; // set this to true when a good one was found
@@ -45,6 +49,7 @@ bool DeviceManager::CreateDevice()
 
 	if (!adapterFound)
 	{
+		ASSERT(false);
 		return false;
 	}
 
@@ -56,18 +61,19 @@ bool DeviceManager::CreateDevice()
 	);
 	if (FAILED(mHr))
 	{
+		ASSERT(false);
 		return false;
 	}
 
 	return true;
 }
 
-ComPtr<ID3D12Device> const DeviceManager::GetDevice() const
+ComPtr<ID3D12Device> DeviceManager::GetDevice() const
 {
 	return mDevice;
 }
 
-ComPtr<IDXGIFactory4> const DeviceManager::GetFactory() const
+ComPtr<IDXGIFactory4> DeviceManager::GetFactory() const
 {
 	return mFactory;
 }
