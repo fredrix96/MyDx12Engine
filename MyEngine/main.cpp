@@ -2,28 +2,25 @@
 #include "windowManager.h"
 #include "deviceManager.h"
 #include "commandQueueManager.h"
+#include "swapChainManager.h"
 
 #pragma region globals
 
 // direct3d stuff
-const int frameBufferCount = 3; // number of buffers we want, 2 for double buffering, 3 for tripple buffering
-
-ComPtr<IDXGISwapChain3> swapChain; // swapchain used to switch between render targets
-
 ComPtr<ID3D12DescriptorHeap> rtvDescriptorHeap; // a descriptor heap to hold resources like the render targets
 
-ComPtr<ID3D12Resource> renderTargets[frameBufferCount]; // number of render targets equal to buffer count
+ComPtr<ID3D12Resource> renderTargets[NUM_OF_FRAME_BUFFERS]; // number of render targets equal to buffer count
 
-ComPtr<ID3D12CommandAllocator> commandAllocator[frameBufferCount]; // we want enough allocators for each buffer * number of threads (we only have one thread)
+ComPtr<ID3D12CommandAllocator> commandAllocator[NUM_OF_FRAME_BUFFERS]; // we want enough allocators for each buffer * number of threads (we only have one thread)
 
 ComPtr<ID3D12GraphicsCommandList> commandList; // a command list we can record commands into, then execute them to render the frame
 
-ComPtr<ID3D12Fence> fence[frameBufferCount];    // an object that is locked while our command list is being executed by the gpu. We need as many 
+ComPtr<ID3D12Fence> fence[NUM_OF_FRAME_BUFFERS];    // an object that is locked while our command list is being executed by the gpu. We need as many 
 										 //as we have allocators (more if we want to know when the gpu is finished with an asset)
 
 HANDLE fenceEvent; // a handle to an event when our fence is unlocked by the gpu
 
-UINT64 fenceValue[frameBufferCount]; // this value is incremented each frame. each fence will have its own value
+UINT64 fenceValue[NUM_OF_FRAME_BUFFERS]; // this value is incremented each frame. each fence will have its own value
 
 int frameIndex; // current rtv we are on
 
@@ -68,9 +65,9 @@ int ConstantBufferPerObjectAlignedSize = (sizeof(ConstantBufferPerObject) + 255)
 ConstantBufferPerObject cbPerObject; // this is the constant buffer data we will send to the gpu 
 										// (which will be placed in the resource we created above)
 
-ComPtr<ID3D12Resource> constantBufferUploadHeaps[frameBufferCount]; // this is the memory on the gpu where constant buffers for each frame will be placed
+ComPtr<ID3D12Resource> constantBufferUploadHeaps[NUM_OF_FRAME_BUFFERS]; // this is the memory on the gpu where constant buffers for each frame will be placed
 
-UINT8* cbvGPUAddress[frameBufferCount]; // this is a pointer to each of the constant buffer resource heaps
+UINT8* cbvGPUAddress[NUM_OF_FRAME_BUFFERS]; // this is a pointer to each of the constant buffer resource heaps
 
 XMFLOAT4X4 cameraProjMat; // this will store our projection matrix
 XMFLOAT4X4 cameraViewMat; // this will store our view matrix
@@ -99,19 +96,22 @@ struct Vertex {
 
 void EnableDebugLayer(); // enable debug layer
 
-void mainloop(CommandQueueManager& cqm); // main application loop
+void mainloop(CommandQueueManager& cqm, SwapChainManager& scm); // main application loop
 
-bool InitD3D(WindowManager& window, DeviceManager& dm, CommandQueueManager& cqm); // initializes direct3d 12
+bool InitD3D(WindowManager& window,
+	DeviceManager& dm,
+	CommandQueueManager& cqm,
+	SwapChainManager& scm); // initializes direct3d 12
 
 void Update(); // update the game logic
 
-void UpdatePipeline(); // update the direct3d pipeline (update command lists)
+void UpdatePipeline(SwapChainManager& scm); // update the direct3d pipeline (update command lists)
 
-void Render(CommandQueueManager& cqm); // execute the command list
+void Render(CommandQueueManager& cqm, SwapChainManager& scm); // execute the command list
 
-void Cleanup(); // release com ojects and clean up memory
+void Cleanup(SwapChainManager& scm); // release com ojects and clean up memory
 
-void WaitForPreviousFrame(); // wait until gpu is finished with command list
+void WaitForPreviousFrame(SwapChainManager& scm); // wait until gpu is finished with command list
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nShowCmd)
 {
@@ -133,31 +133,32 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	// Prepare all the managers
 	DeviceManager dm;
 	CommandQueueManager cqm;
+	SwapChainManager scm;
 
 	// initialize direct3d
-	if (!InitD3D(mainWindow, dm, cqm))
+	if (!InitD3D(mainWindow, dm, cqm, scm))
 	{
 		MessageBox(0, L"Failed to initialize direct3d 12", L"Error", MB_OK);
-		Cleanup();
+		Cleanup(scm);
 		return 1;
 	}
 
 	// start the main loop
-	mainloop(cqm);
+	mainloop(cqm, scm);
 
 	// we want to wait for the gpu to finish executing the command list before we start releasing everything
-	WaitForPreviousFrame();
+	WaitForPreviousFrame(scm);
 
 	// close the fence event
 	CloseHandle(fenceEvent);
 
 	// clean up everything
-	Cleanup();
+	Cleanup(scm);
 
 	return 0;
 }
 
-void mainloop(CommandQueueManager& cqm) {
+void mainloop(CommandQueueManager& cqm, SwapChainManager& scm) {
 	MSG msg;
 	ZeroMemory(&msg, sizeof(MSG));
 
@@ -174,76 +175,47 @@ void mainloop(CommandQueueManager& cqm) {
 		else {
 			// run game code
 			Update(); // update the game logic
-			Render(cqm); // execute the command queue (rendering the scene is the result of the gpu executing the command lists)
+			Render(cqm, scm); // execute the command queue (rendering the scene is the result of the gpu executing the command lists)
 		}
 	}
 }
 
-bool InitD3D(WindowManager& window, DeviceManager& dm, CommandQueueManager& cqm)
+bool InitD3D(WindowManager& window,
+	DeviceManager& dm,
+	CommandQueueManager& cqm,
+	SwapChainManager& scm)
 {
 	bool isCreated = false;
 
 	// -- Create the Device -- //
 
 	isCreated = dm.CreateDevice();
-
-	if (!isCreated) return false;
-
-	ComPtr<ID3D12Device> device = dm.GetDevice();
-	ComPtr<IDXGIFactory4> dxgiFactory = dm.GetFactory();
+	ASSERT(isCreated);
 
 	// -- Create a direct command queue -- //
 
-	isCreated = cqm.CreateDirectCommandQueue(device.Get());
-
-	if (!isCreated) return false;
-
-	ComPtr<ID3D12CommandQueue> commandQueue = cqm.GetDirectCommandQueue();
+	isCreated = cqm.CreateDirectCommandQueue(dm.GetDevice().Get());
+	ASSERT(isCreated);
 
 	// -- Create the Swap Chain (double/tripple buffering) -- //
 
-	DXGI_MODE_DESC backBufferDesc = {}; // this is to describe our display mode
-	backBufferDesc.Width = window.GetWidth(); // buffer width
-	backBufferDesc.Height = window.GetHeight(); // buffer height
-	backBufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // format of the buffer (rgba 32 bits, 8 bits for each chanel)
+	isCreated = scm.CreateSwapChain(window, dm.GetFactory().Get(),
+		cqm.GetDirectCommandQueue().Get(), NUM_OF_FRAME_BUFFERS);
+	ASSERT(isCreated);
 
-														// describe our multi-sampling. We are not multi-sampling, so we set the count to 1 (we need at least one sample of course)
-	DXGI_SAMPLE_DESC sampleDesc = {};
-	sampleDesc.Count = 1; // multisample count (no multisampling, so we just put 1, since we still need 1 sample)
-
-						  // Describe and create the swap chain.
-	DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
-	swapChainDesc.BufferCount = frameBufferCount; // number of buffers we have
-	swapChainDesc.BufferDesc = backBufferDesc; // our back buffer description
-	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT; // this says the pipeline will render to this swap chain
-	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD; // dxgi will discard the buffer (data) after we call present
-	swapChainDesc.OutputWindow = window.GetHWND(); // handle to our window
-	swapChainDesc.SampleDesc = sampleDesc; // our multi-sampling description
-	swapChainDesc.Windowed = !window.IsFullscreen(); // set to true, then if in fullscreen must call SetFullScreenState with true for full screen to get uncapped fps
-
-	IDXGISwapChain* tempSwapChain;
-
-	dxgiFactory->CreateSwapChain(
-		commandQueue.Get(), // the queue will be flushed once the swap chain is created
-		&swapChainDesc, // give it the swap chain description we created above
-		&tempSwapChain // store the created swap chain in a temp IDXGISwapChain interface
-		);
-
-	swapChain = static_cast<IDXGISwapChain3*>(tempSwapChain);
-
-	frameIndex = swapChain->GetCurrentBackBufferIndex();
+	frameIndex = scm.GetSwapChain()->GetCurrentBackBufferIndex();
 
 	// -- Create the Back Buffers (render target views) Descriptor Heap -- //
 
 	// describe an rtv descriptor heap and create
 	D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-	rtvHeapDesc.NumDescriptors = frameBufferCount; // number of descriptors for this heap.
+	rtvHeapDesc.NumDescriptors = NUM_OF_FRAME_BUFFERS; // number of descriptors for this heap.
 	rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV; // this heap is a render target view heap
 
 													   // This heap will not be directly referenced by the shaders (not shader visible), as this will store the output from the pipeline
 													   // otherwise we would set the heap's flag to D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE
 	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	HRESULT hr = device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&rtvDescriptorHeap));
+	HRESULT hr = dm.GetDevice()->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&rtvDescriptorHeap));
 	if (FAILED(hr))
 	{
 		return false;
@@ -252,25 +224,25 @@ bool InitD3D(WindowManager& window, DeviceManager& dm, CommandQueueManager& cqm)
 	// get the size of a descriptor in this heap (this is a rtv heap, so only rtv descriptors should be stored in it.
 	// descriptor sizes may vary from device to device, which is why there is no set size and we must ask the 
 	// device to give us the size. we will use this size to increment a descriptor handle offset
-	rtvDescriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	rtvDescriptorSize = dm.GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
 	// get a handle to the first descriptor in the descriptor heap. a handle is basically a pointer,
 	// but we cannot literally use it like a c++ pointer.
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
 	// Create a RTV for each buffer (double buffering is two buffers, tripple buffering is 3).
-	for (int i = 0; i < frameBufferCount; i++)
+	for (int i = 0; i < NUM_OF_FRAME_BUFFERS; i++)
 	{
 		// first we get the n'th buffer in the swap chain and store it in the n'th
 		// position of our ID3D12Resource array
-		hr = swapChain->GetBuffer(i, IID_PPV_ARGS(&renderTargets[i]));
+		hr = scm.GetSwapChain()->GetBuffer(i, IID_PPV_ARGS(&renderTargets[i]));
 		if (FAILED(hr))
 		{
 			return false;
 		}
 
 		// the we "create" a render target view which binds the swap chain buffer (ID3D12Resource[n]) to the rtv handle
-		device->CreateRenderTargetView(renderTargets[i].Get(), nullptr, rtvHandle);
+		dm.GetDevice()->CreateRenderTargetView(renderTargets[i].Get(), nullptr, rtvHandle);
 
 		// we increment the rtv handle by the rtv descriptor size we got above
 		rtvHandle.Offset(1, rtvDescriptorSize);
@@ -278,9 +250,9 @@ bool InitD3D(WindowManager& window, DeviceManager& dm, CommandQueueManager& cqm)
 
 	// -- Create the Command Allocators -- //
 
-	for (int i = 0; i < frameBufferCount; i++)
+	for (int i = 0; i < NUM_OF_FRAME_BUFFERS; i++)
 	{
-		hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator[i]));
+		hr = dm.GetDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator[i]));
 		if (FAILED(hr))
 		{
 			return false;
@@ -290,7 +262,7 @@ bool InitD3D(WindowManager& window, DeviceManager& dm, CommandQueueManager& cqm)
 	// -- Create a Command List -- //
 
 	// create the command list with the first allocator
-	hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator[frameIndex].Get(), NULL, IID_PPV_ARGS(commandList.GetAddressOf()));
+	hr = dm.GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator[frameIndex].Get(), NULL, IID_PPV_ARGS(commandList.GetAddressOf()));
 	if (FAILED(hr))
 	{
 		return false;
@@ -299,9 +271,9 @@ bool InitD3D(WindowManager& window, DeviceManager& dm, CommandQueueManager& cqm)
 	// -- Create a Fence & Fence Event -- //
 
 	// create the fences
-	for (int i = 0; i < frameBufferCount; i++)
+	for (int i = 0; i < NUM_OF_FRAME_BUFFERS; i++)
 	{
-		hr = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence[i]));
+		hr = dm.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence[i]));
 		if (FAILED(hr))
 		{
 			return false;
@@ -347,7 +319,7 @@ bool InitD3D(WindowManager& window, DeviceManager& dm, CommandQueueManager& cqm)
 		return false;
 	}
 
-	hr = device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
+	hr = dm.GetDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
 	if (FAILED(hr))
 	{
 		return false;
@@ -445,7 +417,7 @@ bool InitD3D(WindowManager& window, DeviceManager& dm, CommandQueueManager& cqm)
 	psoDesc.PS = pixelShaderBytecode; // same as VS but for pixel shader
 	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE; // type of topology we are drawing
 	psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM; // format of the render target
-	psoDesc.SampleDesc = sampleDesc; // must be the same sample description as the swapchain and depth/stencil buffer
+	psoDesc.SampleDesc = scm.GetSampleDesc(); // must be the same sample description as the swapchain and depth/stencil buffer
 	psoDesc.SampleMask = 0xffffffff; // sample mask has to do with multi-sampling. 0xffffffff means point sampling is done
 	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT); // a default rasterizer state.
 	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT); // a default blent state.
@@ -453,7 +425,7 @@ bool InitD3D(WindowManager& window, DeviceManager& dm, CommandQueueManager& cqm)
 	psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT); // a default depth stencil state
 
 	// create the pso
-	hr = device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineStateObject));
+	hr = dm.GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineStateObject));
 	if (FAILED(hr))
 	{
 		return false;
@@ -506,7 +478,7 @@ bool InitD3D(WindowManager& window, DeviceManager& dm, CommandQueueManager& cqm)
 	// default heap is memory on the GPU. Only the GPU has access to this memory
 	// To get data into this heap, we will have to upload the data using
 	// an upload heap
-	device->CreateCommittedResource(
+	dm.GetDevice()->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), // a default heap
 		D3D12_HEAP_FLAG_NONE, // no flags
 		&CD3DX12_RESOURCE_DESC::Buffer(vBufferSize), // resource description for a buffer
@@ -522,7 +494,7 @@ bool InitD3D(WindowManager& window, DeviceManager& dm, CommandQueueManager& cqm)
 	// upload heaps are used to upload data to the GPU. CPU can write to it, GPU can read from it
 	// We will upload the vertex buffer using this heap to the default heap
 	ComPtr<ID3D12Resource> vBufferUploadHeap;
-	hr = device->CreateCommittedResource(
+	hr = dm.GetDevice()->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), // upload heap
 		D3D12_HEAP_FLAG_NONE, // no flags
 		&CD3DX12_RESOURCE_DESC::Buffer(vBufferSize), // resource description for a buffer
@@ -582,7 +554,7 @@ bool InitD3D(WindowManager& window, DeviceManager& dm, CommandQueueManager& cqm)
 	numCubeIndices = sizeof(iList) / sizeof(DWORD);
 
 	// create default heap to hold index buffer
-	device->CreateCommittedResource(
+	dm.GetDevice()->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), // a default heap
 		D3D12_HEAP_FLAG_NONE, // no flags
 		&CD3DX12_RESOURCE_DESC::Buffer(iBufferSize), // resource description for a buffer
@@ -595,7 +567,7 @@ bool InitD3D(WindowManager& window, DeviceManager& dm, CommandQueueManager& cqm)
 
 	// create upload heap to upload index buffer
 	ComPtr<ID3D12Resource> iBufferUploadHeap;
-	hr = device->CreateCommittedResource(
+	hr = dm.GetDevice()->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), // upload heap
 		D3D12_HEAP_FLAG_NONE, // no flags
 		&CD3DX12_RESOURCE_DESC::Buffer(vBufferSize), // resource description for a buffer
@@ -628,7 +600,7 @@ bool InitD3D(WindowManager& window, DeviceManager& dm, CommandQueueManager& cqm)
 	dsvHeapDesc.NumDescriptors = 1;
 	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	hr = device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&dsDescriptorHeap));
+	hr = dm.GetDevice()->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&dsDescriptorHeap));
 	if (FAILED(hr))
 	{
 		gWindowRunning = false;
@@ -644,7 +616,7 @@ bool InitD3D(WindowManager& window, DeviceManager& dm, CommandQueueManager& cqm)
 	depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
 	depthOptimizedClearValue.DepthStencil.Stencil = 0;
 
-	device->CreateCommittedResource(
+	dm.GetDevice()->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,
 		&CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, window.GetWidth(), window.GetHeight(), 1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
@@ -654,7 +626,7 @@ bool InitD3D(WindowManager& window, DeviceManager& dm, CommandQueueManager& cqm)
 		);
 	dsDescriptorHeap->SetName(L"Depth/Stencil Resource Heap");
 
-	device->CreateDepthStencilView(depthStencilBuffer.Get(), &depthStencilDesc, dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+	dm.GetDevice()->CreateDepthStencilView(depthStencilBuffer.Get(), &depthStencilDesc, dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
 	// create the constant buffer resource heap
 	// We will update the constant buffer one or more times per frame, so we will use only an upload heap
@@ -670,10 +642,10 @@ bool InitD3D(WindowManager& window, DeviceManager& dm, CommandQueueManager& cqm)
 	// 16 floats in one constant buffer, and we will store 2 constant buffers in each
 	// heap, one for each cube, thats only 64x2 bits, or 128 bits we are using for each
 	// resource, and each resource must be at least 64KB (65536 bits)
-	for (int i = 0; i < frameBufferCount; ++i)
+	for (int i = 0; i < NUM_OF_FRAME_BUFFERS; ++i)
 	{
 		// create resource for cube 1
-		hr = device->CreateCommittedResource(
+		hr = dm.GetDevice()->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), // this heap will be used to upload the constant buffer data
 			D3D12_HEAP_FLAG_NONE, // no flags
 			&CD3DX12_RESOURCE_DESC::Buffer(1024 * 64), // size of the resource heap. Must be a multiple of 64KB for single-textures and constant buffers
@@ -698,11 +670,11 @@ bool InitD3D(WindowManager& window, DeviceManager& dm, CommandQueueManager& cqm)
 	// Now we execute the command list to upload the initial assets (triangle data)
 	commandList->Close();
 	ComPtr<ID3D12CommandList> ppCommandLists[] = { commandList.Get() };
-	commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists->GetAddressOf());
+	cqm.GetDirectCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists->GetAddressOf());
 
 	// increment the fence value now, otherwise the buffer might not be uploaded by the time we start drawing
 	fenceValue[frameIndex]++;
-	hr = commandQueue->Signal(fence[frameIndex].Get(), fenceValue[frameIndex]);
+	hr = cqm.GetDirectCommandQueue()->Signal(fence[frameIndex].Get(), fenceValue[frameIndex]);
 	if (FAILED(hr))
 	{
 		gWindowRunning = false;
@@ -836,12 +808,12 @@ void Update()
 	XMStoreFloat4x4(&cube2WorldMat, worldMat);
 }
 
-void UpdatePipeline()
+void UpdatePipeline(SwapChainManager& scm)
 {
 	HRESULT hr;
 
 	// We have to wait for the gpu to finish with the command allocator before we reset it
-	WaitForPreviousFrame();
+	WaitForPreviousFrame(scm);
 
 	// we can only reset an allocator once the gpu is done with it
 	// resetting an allocator frees the memory that the command list was stored in
@@ -927,11 +899,11 @@ void UpdatePipeline()
 	}
 }
 
-void Render(CommandQueueManager& cqm)
+void Render(CommandQueueManager& cqm, SwapChainManager& scm)
 {
 	HRESULT hr;
 
-	UpdatePipeline(); // update the pipeline by sending commands to the commandqueue
+	UpdatePipeline(scm); // update the pipeline by sending commands to the commandqueue
 
 	// create an array of command lists (only one command list here)
 	ComPtr<ID3D12CommandList> ppCommandLists[] = { commandList.Get() };
@@ -950,36 +922,36 @@ void Render(CommandQueueManager& cqm)
 	}
 
 	// present the current backbuffer
-	hr = swapChain->Present(0, 0);
+	hr = scm.GetSwapChain()->Present(0, 0);
 	if (FAILED(hr))
 	{
 		gWindowRunning = false;
 	}
 }
 
-void Cleanup()
+void Cleanup(SwapChainManager& scm)
 {
 	// wait for the gpu to finish all frames
-	for (int i = 0; i < frameBufferCount; ++i)
+	for (int i = 0; i < NUM_OF_FRAME_BUFFERS; ++i)
 	{
 		frameIndex = i;
-		WaitForPreviousFrame();
+		WaitForPreviousFrame(scm);
 	}
 
 	// get swapchain out of full screen before exiting
 	BOOL fs = false;
-	if (swapChain->GetFullscreenState(&fs, NULL) == (LRESULT)true)
+	if (scm.GetSwapChain()->GetFullscreenState(&fs, NULL) == (LRESULT)true)
 	{
-		swapChain->SetFullscreenState(false, NULL);
+		scm.GetSwapChain()->SetFullscreenState(false, NULL);
 	}
 }
 
-void WaitForPreviousFrame()
+void WaitForPreviousFrame(SwapChainManager& scm)
 {
 	HRESULT hr;
 
 	// swap the current rtv buffer index so we draw on the correct buffer
-	frameIndex = swapChain->GetCurrentBackBufferIndex();
+	frameIndex = scm.GetSwapChain()->GetCurrentBackBufferIndex();
 
 	// if the current fence value is still less than "fenceValue", then we know the GPU has not finished executing
 	// the command queue since it has not reached the "commandQueue->Signal(fence, fenceValue)" command
