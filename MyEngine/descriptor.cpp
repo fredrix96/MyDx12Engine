@@ -12,6 +12,12 @@ Descriptor::~Descriptor()
 
 bool Descriptor::Create(ID3D12Device* device, IDXGISwapChain3* swapChain, std::wstring name)
 {
+	if (mDescriptorHeap != NULL)
+	{
+		ASSERT(false);
+		return false;
+	}
+
 	// describe an rtv descriptor heap and create
 	mDescriptorHeapDesc.NumDescriptors = NUM_OF_FRAME_BUFFERS; // number of descriptors for this heap.
 

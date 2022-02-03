@@ -4,21 +4,12 @@
 #include "commandQueueManager.h"
 #include "swapChainManager.h"
 #include "descriptorManager.h"
+#include "commandManager.h"
+#include "fenceManager.h"
 
 #pragma region globals
 
 // direct3d stuff
-ComPtr<ID3D12CommandAllocator> commandAllocator[NUM_OF_FRAME_BUFFERS]; // we want enough allocators for each buffer * number of threads (we only have one thread)
-
-ComPtr<ID3D12GraphicsCommandList> commandList; // a command list we can record commands into, then execute them to render the frame
-
-ComPtr<ID3D12Fence> fence[NUM_OF_FRAME_BUFFERS];    // an object that is locked while our command list is being executed by the gpu. We need as many 
-										 //as we have allocators (more if we want to know when the gpu is finished with an asset)
-
-HANDLE fenceEvent; // a handle to an event when our fence is unlocked by the gpu
-
-UINT64 fenceValue[NUM_OF_FRAME_BUFFERS]; // this value is incremented each frame. each fence will have its own value
-
 int frameIndex; // current rtv we are on
 
 ComPtr<ID3D12PipelineState> pipelineStateObject; // pso containing a pipeline state
@@ -90,23 +81,26 @@ struct Vertex {
 
 void EnableDebugLayer(); // enable debug layer
 
-void mainloop(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& descm); // main application loop
+void mainloop(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& descm, CommandManager& cm, FenceManager& fm); // main application loop
 
+ // initializes direct3d 12
 bool InitD3D(WindowManager& window,
 	DeviceManager& dm,
 	CommandQueueManager& cqm,
 	SwapChainManager& scm,
-	DescriptorManager& descm); // initializes direct3d 12
+	DescriptorManager& descm,
+	CommandManager& cm,
+	FenceManager& fm);
 
 void Update(); // update the game logic
 
-void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm); // update the direct3d pipeline (update command lists)
+void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm, CommandManager& cm, FenceManager& fm); // update the direct3d pipeline (update command lists)
 
-void Render(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& descm); // execute the command list
+void Render(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& descm, CommandManager& cm, FenceManager& fm); // execute the command list
 
-void Cleanup(SwapChainManager& scm); // release com ojects and clean up memory
+void Cleanup(SwapChainManager& scm, FenceManager& fm); // release com ojects and clean up memory
 
-void WaitForPreviousFrame(SwapChainManager& scm); // wait until gpu is finished with command list
+void WaitForPreviousFrame(SwapChainManager& scm, FenceManager& fm); // wait until gpu is finished with command list
 
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ PWSTR pCmdLine, _In_ int nShowCmd)
 {
@@ -130,31 +124,33 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	CommandQueueManager cqm;
 	SwapChainManager scm;
 	DescriptorManager descm;
+	CommandManager cm;
+	FenceManager fm;
 
 	// initialize direct3d
-	if (!InitD3D(mainWindow, dm, cqm, scm, descm))
+	if (!InitD3D(mainWindow, dm, cqm, scm, descm, cm, fm))
 	{
 		MessageBox(0, L"Failed to initialize direct3d 12", L"Error", MB_OK);
-		Cleanup(scm);
+		Cleanup(scm, fm);
 		return 1;
 	}
 
 	// start the main loop
-	mainloop(cqm, scm, descm);
+	mainloop(cqm, scm, descm, cm, fm);
 
 	// we want to wait for the gpu to finish executing the command list before we start releasing everything
-	WaitForPreviousFrame(scm);
+	WaitForPreviousFrame(scm, fm);
 
 	// close the fence event
-	CloseHandle(fenceEvent);
+	CloseHandle(fm.GetFenceEvent());
 
 	// clean up everything
-	Cleanup(scm);
+	Cleanup(scm, fm);
 
 	return 0;
 }
 
-void mainloop(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& descm) {
+void mainloop(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& descm, CommandManager& cm, FenceManager& fm) {
 	MSG msg;
 	ZeroMemory(&msg, sizeof(MSG));
 
@@ -171,7 +167,7 @@ void mainloop(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager
 		else {
 			// run game code
 			Update(); // update the game logic
-			Render(cqm, scm, descm); // execute the command queue (rendering the scene is the result of the gpu executing the command lists)
+			Render(cqm, scm, descm, cm, fm); // execute the command queue (rendering the scene is the result of the gpu executing the command lists)
 		}
 	}
 }
@@ -180,7 +176,9 @@ bool InitD3D(WindowManager& window,
 	DeviceManager& dm,
 	CommandQueueManager& cqm,
 	SwapChainManager& scm,
-	DescriptorManager& descm)
+	DescriptorManager& descm,
+	CommandManager& cm,
+	FenceManager& fm)
 {
 	bool isCreated = false;
 
@@ -209,43 +207,18 @@ bool InitD3D(WindowManager& window,
 
 	// -- Create the Command Allocators -- //
 
-	for (int i = 0; i < NUM_OF_FRAME_BUFFERS; i++)
-	{
-		HRESULT hr = dm.GetDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator[i]));
-		if (FAILED(hr))
-		{
-			return false;
-		}
-	}
+	isCreated = cm.CreateCommandAllocators(dm.GetDevice().Get());
+	ASSERT(isCreated);
 
 	// -- Create a Command List -- //
 
-	// create the command list with the first allocator
-	HRESULT hr = dm.GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator[frameIndex].Get(), NULL, IID_PPV_ARGS(commandList.GetAddressOf()));
-	if (FAILED(hr))
-	{
-		return false;
-	}
+	isCreated = cm.CreateCommandList(dm.GetDevice().Get(), frameIndex);
+	ASSERT(isCreated);
 
 	// -- Create a Fence & Fence Event -- //
 
-	// create the fences
-	for (int i = 0; i < NUM_OF_FRAME_BUFFERS; i++)
-	{
-		hr = dm.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence[i]));
-		if (FAILED(hr))
-		{
-			return false;
-		}
-		fenceValue[i] = 0; // set the initial fence value to 0
-	}
-
-	// create a handle to a fence event
-	fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-	if (fenceEvent == nullptr)
-	{
-		return false;
-	}
+	isCreated = fm.CreateFences(dm.GetDevice().Get());
+	ASSERT(isCreated);
 
 	// create root signature
 
@@ -272,7 +245,7 @@ bool InitD3D(WindowManager& window,
 		D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS);
 
 	ComPtr<ID3DBlob> signature;
-	hr = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, nullptr);
+	HRESULT hr = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, nullptr);
 	if (FAILED(hr))
 	{
 		return false;
@@ -474,10 +447,10 @@ bool InitD3D(WindowManager& window,
 
 	// we are now creating a command with the command list to copy the data from
 	// the upload heap to the default heap
-	UpdateSubresources(commandList.Get(), vertexBuffer.Get(), vBufferUploadHeap.Get(), 0, 0, 1, &vertexData);
+	UpdateSubresources(cm.GetCommandList().Get(), vertexBuffer.Get(), vBufferUploadHeap.Get(), 0, 0, 1, &vertexData);
 
 	// transition the vertex buffer data from copy destination state to vertex buffer state
-	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(vertexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+	cm.GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(vertexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 
 	// Create index buffer
 
@@ -547,10 +520,10 @@ bool InitD3D(WindowManager& window,
 
 	// we are now creating a command with the command list to copy the data from
 	// the upload heap to the default heap
-	UpdateSubresources(commandList.Get(), indexBuffer.Get(), iBufferUploadHeap.Get(), 0, 0, 1, &indexData);
+	UpdateSubresources(cm.GetCommandList().Get(), indexBuffer.Get(), iBufferUploadHeap.Get(), 0, 0, 1, &indexData);
 
 	// transition the vertex buffer data from copy destination state to vertex buffer state
-	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(indexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+	cm.GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(indexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 
 	// Create the depth/stencil buffer
 
@@ -627,13 +600,13 @@ bool InitD3D(WindowManager& window,
 	}
 
 	// Now we execute the command list to upload the initial assets (triangle data)
-	commandList->Close();
-	ComPtr<ID3D12CommandList> ppCommandLists[] = { commandList.Get() };
+	cm.GetCommandList()->Close();
+	ComPtr<ID3D12CommandList> ppCommandLists[] = { cm.GetCommandList().Get() };
 	cqm.GetDirectCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists->GetAddressOf());
 
 	// increment the fence value now, otherwise the buffer might not be uploaded by the time we start drawing
-	fenceValue[frameIndex]++;
-	hr = cqm.GetDirectCommandQueue()->Signal(fence[frameIndex].Get(), fenceValue[frameIndex]);
+	fm.IncrementFenceValue(frameIndex);
+	hr = cqm.GetDirectCommandQueue()->Signal(fm.GetFence(frameIndex).Get(), fm.GetFenceValue(frameIndex));
 	if (FAILED(hr))
 	{
 		gWindowRunning = false;
@@ -767,16 +740,16 @@ void Update()
 	XMStoreFloat4x4(&cube2WorldMat, worldMat);
 }
 
-void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm)
+void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm, CommandManager& cm, FenceManager& fm)
 {
 	HRESULT hr;
 
 	// We have to wait for the gpu to finish with the command allocator before we reset it
-	WaitForPreviousFrame(scm);
+	WaitForPreviousFrame(scm, fm);
 
 	// we can only reset an allocator once the gpu is done with it
 	// resetting an allocator frees the memory that the command list was stored in
-	hr = commandAllocator[frameIndex]->Reset();
+	hr = cm.GetCommandAllocator(frameIndex)->Reset();
 	if (FAILED(hr))
 	{
 		gWindowRunning = false;
@@ -792,7 +765,7 @@ void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm)
 	// but in this tutorial we are only clearing the rtv, and do not actually need
 	// anything but an initial default pipeline, which is what we get by setting
 	// the second parameter to NULL
-	hr = commandList->Reset(commandAllocator[frameIndex].Get(), pipelineStateObject.Get());
+	hr = cm.GetCommandList()->Reset(cm.GetCommandAllocator(frameIndex).Get(), pipelineStateObject.Get());
 	if (FAILED(hr))
 	{
 		gWindowRunning = false;
@@ -801,7 +774,7 @@ void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm)
 	// here we start recording commands into the commandList (which all the commands will be stored in the commandAllocator)
 
 	// transition the "frameIndex" render target from the present state to the render target state so the command list draws to it starting from here
-	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(descm.GetRTVDescriptor(L"first").GetRenderTarget(frameIndex).Get(),
+	cm.GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(descm.GetRTVDescriptor(L"first").GetRenderTarget(frameIndex).Get(),
 		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 	// here we again get the handle to our current render target view so we can set it as the render target in the output merger stage of the pipeline
@@ -811,63 +784,67 @@ void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm)
 	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
 	// set the render target for the output merger stage (the output of the pipeline)
-	commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+	cm.GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
 	// Clear the render target by using the ClearRenderTargetView command
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-	commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+	cm.GetCommandList()->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
 	// clear the depth/stencil buffer
-	commandList->ClearDepthStencilView(dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+	cm.GetCommandList()->ClearDepthStencilView(dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 	// set root signature
-	commandList->SetGraphicsRootSignature(rootSignature.Get()); // set the root signature
+	cm.GetCommandList()->SetGraphicsRootSignature(rootSignature.Get()); // set the root signature
 
 	// draw triangle
-	commandList->RSSetViewports(1, &viewport); // set the viewports
-	commandList->RSSetScissorRects(1, &scissorRect); // set the scissor rects
-	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST); // set the primitive topology
-	commandList->IASetVertexBuffers(0, 1, &vertexBufferView); // set the vertex buffer (using the vertex buffer view)
-	commandList->IASetIndexBuffer(&indexBufferView);
+	cm.GetCommandList()->RSSetViewports(1, &viewport); // set the viewports
+	cm.GetCommandList()->RSSetScissorRects(1, &scissorRect); // set the scissor rects
+	cm.GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST); // set the primitive topology
+	cm.GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView); // set the vertex buffer (using the vertex buffer view)
+	cm.GetCommandList()->IASetIndexBuffer(&indexBufferView);
 
 	// first cube
 
 	// set cube1's constant buffer
-	commandList->SetGraphicsRootConstantBufferView(0, constantBufferUploadHeaps[frameIndex]->GetGPUVirtualAddress());
+	cm.GetCommandList()->SetGraphicsRootConstantBufferView(0, constantBufferUploadHeaps[frameIndex]->GetGPUVirtualAddress());
 
 	// draw first cube
-	commandList->DrawIndexedInstanced(numCubeIndices, 1, 0, 0, 0);
+	cm.GetCommandList()->DrawIndexedInstanced(numCubeIndices, 1, 0, 0, 0);
 
 	// second cube
 
 	// set cube2's constant buffer. You can see we are adding the size of ConstantBufferPerObject to the constant buffer
 	// resource heaps address. This is because cube1's constant buffer is stored at the beginning of the resource heap, while
 	// cube2's constant buffer data is stored after (256 bits from the start of the heap).
-	commandList->SetGraphicsRootConstantBufferView(0, constantBufferUploadHeaps[frameIndex]->GetGPUVirtualAddress() + ConstantBufferPerObjectAlignedSize);
+	cm.GetCommandList()->SetGraphicsRootConstantBufferView(0, constantBufferUploadHeaps[frameIndex]->GetGPUVirtualAddress() + ConstantBufferPerObjectAlignedSize);
 
 	// draw second cube
-	commandList->DrawIndexedInstanced(numCubeIndices, 1, 0, 0, 0);
+	cm.GetCommandList()->DrawIndexedInstanced(numCubeIndices, 1, 0, 0, 0);
 
 	// transition the "frameIndex" render target from the render target state to the present state. If the debug layer is enabled, you will receive a
 	// warning if present is called on the render target when it's not in the present state
-	commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(descm.GetRTVDescriptor(L"first").GetRenderTarget(frameIndex).Get(),
+	cm.GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(descm.GetRTVDescriptor(L"first").GetRenderTarget(frameIndex).Get(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
-	hr = commandList->Close();
+	hr = cm.GetCommandList()->Close();
 	if (FAILED(hr))
 	{
 		gWindowRunning = false;
 	}
 }
 
-void Render(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& descm)
+void Render(CommandQueueManager& cqm,
+	SwapChainManager& scm,
+	DescriptorManager& descm,
+	CommandManager& cm,
+	FenceManager& fm)
 {
 	HRESULT hr;
 
-	UpdatePipeline(scm, descm); // update the pipeline by sending commands to the commandqueue
+	UpdatePipeline(scm, descm, cm, fm); // update the pipeline by sending commands to the commandqueue
 
 	// create an array of command lists (only one command list here)
-	ComPtr<ID3D12CommandList> ppCommandLists[] = { commandList.Get() };
+	ComPtr<ID3D12CommandList> ppCommandLists[] = { cm.GetCommandList().Get() };
 
 	// execute the array of command lists
 	ComPtr<ID3D12CommandQueue> commandQueue = cqm.GetDirectCommandQueue();
@@ -876,7 +853,7 @@ void Render(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& 
 	// this command goes in at the end of our command queue. we will know when our command queue 
 	// has finished because the fence value will be set to "fenceValue" from the GPU since the command
 	// queue is being executed on the GPU
-	hr = commandQueue->Signal(fence[frameIndex].Get(), fenceValue[frameIndex]);
+	hr = commandQueue->Signal(fm.GetFence(frameIndex).Get(), fm.GetFenceValue(frameIndex));
 	if (FAILED(hr))
 	{
 		gWindowRunning = false;
@@ -890,13 +867,13 @@ void Render(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& 
 	}
 }
 
-void Cleanup(SwapChainManager& scm)
+void Cleanup(SwapChainManager& scm, FenceManager& fm)
 {
 	// wait for the gpu to finish all frames
 	for (int i = 0; i < NUM_OF_FRAME_BUFFERS; ++i)
 	{
 		frameIndex = i;
-		WaitForPreviousFrame(scm);
+		WaitForPreviousFrame(scm, fm);
 	}
 
 	// get swapchain out of full screen before exiting
@@ -907,7 +884,7 @@ void Cleanup(SwapChainManager& scm)
 	}
 }
 
-void WaitForPreviousFrame(SwapChainManager& scm)
+void WaitForPreviousFrame(SwapChainManager& scm, FenceManager& fm)
 {
 	HRESULT hr;
 
@@ -916,10 +893,10 @@ void WaitForPreviousFrame(SwapChainManager& scm)
 
 	// if the current fence value is still less than "fenceValue", then we know the GPU has not finished executing
 	// the command queue since it has not reached the "commandQueue->Signal(fence, fenceValue)" command
-	if (fence[frameIndex]->GetCompletedValue() < fenceValue[frameIndex])
+	if (fm.GetFence(frameIndex)->GetCompletedValue() < fm.GetFenceValue(frameIndex))
 	{
 		// we have the fence create an event which is signaled once the fence's current value is "fenceValue"
-		hr = fence[frameIndex]->SetEventOnCompletion(fenceValue[frameIndex], fenceEvent);
+		hr = fm.GetFence(frameIndex)->SetEventOnCompletion(fm.GetFenceValue(frameIndex), fm.GetFenceEvent());
 		if (FAILED(hr))
 		{
 			gWindowRunning = false;
@@ -927,11 +904,11 @@ void WaitForPreviousFrame(SwapChainManager& scm)
 
 		// We will wait until the fence has triggered the event that it's current value has reached "fenceValue". once it's value
 		// has reached "fenceValue", we know the command queue has finished executing
-		WaitForSingleObject(fenceEvent, INFINITE);
+		WaitForSingleObject(fm.GetFenceEvent(), INFINITE);
 	}
 
 	// increment fenceValue for next frame
-	fenceValue[frameIndex]++;
+	fm.IncrementFenceValue(frameIndex);
 }
 
 void EnableDebugLayer()

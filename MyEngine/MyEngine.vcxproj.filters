@@ -16,6 +16,9 @@
     <Filter Include="Shaders">
       <UniqueIdentifier>{ae461830-e3ee-475c-97c5-24cd1ffc9707}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Main">
+      <UniqueIdentifier>{bb1447a4-9aa3-464c-a986-ca0654c1048d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="d3dx12.h">
@@ -27,29 +30,32 @@
     <ClInclude Include="stdafx.h">
       <Filter>Resource Files</Filter>
     </ClInclude>
-    <ClInclude Include="windowManager.h">
-      <Filter>Resource Files</Filter>
-    </ClInclude>
-    <ClInclude Include="deviceManager.h">
-      <Filter>Resource Files</Filter>
+    <ClInclude Include="commandManager.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="commandQueueManager.h">
-      <Filter>Resource Files</Filter>
-    </ClInclude>
-    <ClInclude Include="swapChainManager.h">
-      <Filter>Resource Files</Filter>
-    </ClInclude>
-    <ClInclude Include="descriptorManager.h">
-      <Filter>Resource Files</Filter>
+      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="descriptor.h">
-      <Filter>Resource Files</Filter>
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="descriptorManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="deviceManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="swapChainManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="windowManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="fenceManager.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="windowManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -66,6 +72,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="descriptor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="commandManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>Main</Filter>
+    </ClCompile>
+    <ClCompile Include="fenceManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
