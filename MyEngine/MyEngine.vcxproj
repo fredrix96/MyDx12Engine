@@ -142,6 +142,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="command.h" />
     <ClInclude Include="commandManager.h" />
     <ClInclude Include="commandQueueManager.h" />
     <ClInclude Include="d3dx12.h" />
@@ -155,6 +156,7 @@
     <ClInclude Include="windowManager.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="command.cpp" />
     <ClCompile Include="commandManager.cpp" />
     <ClCompile Include="commandQueueManager.cpp" />
     <ClCompile Include="descriptor.cpp" />

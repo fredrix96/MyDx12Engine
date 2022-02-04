@@ -11,11 +11,14 @@ DescriptorManager::~DescriptorManager()
 bool DescriptorManager::CreateRTVDescriptorHeap(ID3D12Device* device, IDXGISwapChain3* swapChain, std::wstring name)
 {
 	Descriptor desc(DESCRIPTOR_TYPE::RTV);
-	bool created = desc.Create(device, swapChain, name);
+	bool isCreated = desc.Create(device, swapChain, name);
 
-	mRTVDescriptorHeaps.emplace(name, desc);
+	if (isCreated)
+	{
+		mRTVDescriptorHeaps.emplace(name, desc);
+	}
 
-	return created;
+	return isCreated;
 }
 
 Descriptor DescriptorManager::GetRTVDescriptor(std::wstring name) const

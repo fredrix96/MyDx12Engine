@@ -1,22 +1,19 @@
 #pragma once
 
-#include "stdafx.h"
+#include "command.h"
 
 class CommandManager
 {
 private:
-	ComPtr<ID3D12CommandAllocator> mCommandAllocator[NUM_OF_FRAME_BUFFERS]; // we want enough allocators for each buffer * number of threads (we only have one thread)
-	ComPtr<ID3D12GraphicsCommandList> mCommandList; // a command list we can record commands into, then execute them to render the frame
 
-	HRESULT mHr;
+	std::map<std::wstring, Command> mCommands;
+
 public:
 
 	CommandManager();
 	~CommandManager();
 
-	bool CreateCommandAllocators(ID3D12Device* device);
-	bool CreateCommandList(ID3D12Device* device, int frameIndex);
+	bool CreateCommand(ID3D12Device* device, int frameIndex, std::wstring name);
 
-	ComPtr<ID3D12CommandAllocator> GetCommandAllocator(int pos) const;
-	ComPtr<ID3D12GraphicsCommandList> GetCommandList() const;
+	Command GetCommand(std::wstring name) const;
 };

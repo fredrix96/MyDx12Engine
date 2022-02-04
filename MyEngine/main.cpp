@@ -205,14 +205,9 @@ bool InitD3D(WindowManager& window,
 	isCreated = descm.CreateRTVDescriptorHeap(dm.GetDevice().Get(), scm.GetSwapChain().Get(), L"first");
 	ASSERT(isCreated);
 
-	// -- Create the Command Allocators -- //
+	// -- Create the Command Allocators -- And -- Create a Command List --//
 
-	isCreated = cm.CreateCommandAllocators(dm.GetDevice().Get());
-	ASSERT(isCreated);
-
-	// -- Create a Command List -- //
-
-	isCreated = cm.CreateCommandList(dm.GetDevice().Get(), frameIndex);
+	isCreated = cm.CreateCommand(dm.GetDevice().Get(), frameIndex, L"first");
 	ASSERT(isCreated);
 
 	// -- Create a Fence & Fence Event -- //
@@ -447,10 +442,10 @@ bool InitD3D(WindowManager& window,
 
 	// we are now creating a command with the command list to copy the data from
 	// the upload heap to the default heap
-	UpdateSubresources(cm.GetCommandList().Get(), vertexBuffer.Get(), vBufferUploadHeap.Get(), 0, 0, 1, &vertexData);
+	UpdateSubresources(cm.GetCommand(L"first").GetCommandList().Get(), vertexBuffer.Get(), vBufferUploadHeap.Get(), 0, 0, 1, &vertexData);
 
 	// transition the vertex buffer data from copy destination state to vertex buffer state
-	cm.GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(vertexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+	cm.GetCommand(L"first").GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(vertexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 
 	// Create index buffer
 
@@ -520,10 +515,11 @@ bool InitD3D(WindowManager& window,
 
 	// we are now creating a command with the command list to copy the data from
 	// the upload heap to the default heap
-	UpdateSubresources(cm.GetCommandList().Get(), indexBuffer.Get(), iBufferUploadHeap.Get(), 0, 0, 1, &indexData);
+	UpdateSubresources(cm.GetCommand(L"first").GetCommandList().Get(), indexBuffer.Get(), iBufferUploadHeap.Get(), 0, 0, 1, &indexData);
 
 	// transition the vertex buffer data from copy destination state to vertex buffer state
-	cm.GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(indexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+	cm.GetCommand(L"first").GetCommandList()->ResourceBarrier(1,
+		&CD3DX12_RESOURCE_BARRIER::Transition(indexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 
 	// Create the depth/stencil buffer
 
@@ -600,8 +596,8 @@ bool InitD3D(WindowManager& window,
 	}
 
 	// Now we execute the command list to upload the initial assets (triangle data)
-	cm.GetCommandList()->Close();
-	ComPtr<ID3D12CommandList> ppCommandLists[] = { cm.GetCommandList().Get() };
+	cm.GetCommand(L"first").GetCommandList()->Close();
+	ComPtr<ID3D12CommandList> ppCommandLists[] = { cm.GetCommand(L"first").GetCommandList().Get() };
 	cqm.GetDirectCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists->GetAddressOf());
 
 	// increment the fence value now, otherwise the buffer might not be uploaded by the time we start drawing
@@ -749,7 +745,7 @@ void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm, CommandMana
 
 	// we can only reset an allocator once the gpu is done with it
 	// resetting an allocator frees the memory that the command list was stored in
-	hr = cm.GetCommandAllocator(frameIndex)->Reset();
+	hr = cm.GetCommand(L"first").GetCommandAllocator(frameIndex)->Reset();
 	if (FAILED(hr))
 	{
 		gWindowRunning = false;
@@ -765,7 +761,7 @@ void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm, CommandMana
 	// but in this tutorial we are only clearing the rtv, and do not actually need
 	// anything but an initial default pipeline, which is what we get by setting
 	// the second parameter to NULL
-	hr = cm.GetCommandList()->Reset(cm.GetCommandAllocator(frameIndex).Get(), pipelineStateObject.Get());
+	hr = cm.GetCommand(L"first").GetCommandList()->Reset(cm.GetCommand(L"first").GetCommandAllocator(frameIndex).Get(), pipelineStateObject.Get());
 	if (FAILED(hr))
 	{
 		gWindowRunning = false;
@@ -774,8 +770,8 @@ void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm, CommandMana
 	// here we start recording commands into the commandList (which all the commands will be stored in the commandAllocator)
 
 	// transition the "frameIndex" render target from the present state to the render target state so the command list draws to it starting from here
-	cm.GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(descm.GetRTVDescriptor(L"first").GetRenderTarget(frameIndex).Get(),
-		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+	cm.GetCommand(L"first").GetCommandList()->ResourceBarrier(1, 
+		&CD3DX12_RESOURCE_BARRIER::Transition(descm.GetRTVDescriptor(L"first").GetRenderTarget(frameIndex).Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 	// here we again get the handle to our current render target view so we can set it as the render target in the output merger stage of the pipeline
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle = descm.GetRTVDescriptor(L"first").GetHandle(frameIndex);
@@ -784,49 +780,49 @@ void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm, CommandMana
 	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
 	// set the render target for the output merger stage (the output of the pipeline)
-	cm.GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+	cm.GetCommand(L"first").GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
 	// Clear the render target by using the ClearRenderTargetView command
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-	cm.GetCommandList()->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+	cm.GetCommand(L"first").GetCommandList()->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
 	// clear the depth/stencil buffer
-	cm.GetCommandList()->ClearDepthStencilView(dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+	cm.GetCommand(L"first").GetCommandList()->ClearDepthStencilView(dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 	// set root signature
-	cm.GetCommandList()->SetGraphicsRootSignature(rootSignature.Get()); // set the root signature
+	cm.GetCommand(L"first").GetCommandList()->SetGraphicsRootSignature(rootSignature.Get()); // set the root signature
 
 	// draw triangle
-	cm.GetCommandList()->RSSetViewports(1, &viewport); // set the viewports
-	cm.GetCommandList()->RSSetScissorRects(1, &scissorRect); // set the scissor rects
-	cm.GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST); // set the primitive topology
-	cm.GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView); // set the vertex buffer (using the vertex buffer view)
-	cm.GetCommandList()->IASetIndexBuffer(&indexBufferView);
+	cm.GetCommand(L"first").GetCommandList()->RSSetViewports(1, &viewport); // set the viewports
+	cm.GetCommand(L"first").GetCommandList()->RSSetScissorRects(1, &scissorRect); // set the scissor rects
+	cm.GetCommand(L"first").GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST); // set the primitive topology
+	cm.GetCommand(L"first").GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView); // set the vertex buffer (using the vertex buffer view)
+	cm.GetCommand(L"first").GetCommandList()->IASetIndexBuffer(&indexBufferView);
 
 	// first cube
 
 	// set cube1's constant buffer
-	cm.GetCommandList()->SetGraphicsRootConstantBufferView(0, constantBufferUploadHeaps[frameIndex]->GetGPUVirtualAddress());
+	cm.GetCommand(L"first").GetCommandList()->SetGraphicsRootConstantBufferView(0, constantBufferUploadHeaps[frameIndex]->GetGPUVirtualAddress());
 
 	// draw first cube
-	cm.GetCommandList()->DrawIndexedInstanced(numCubeIndices, 1, 0, 0, 0);
+	cm.GetCommand(L"first").GetCommandList()->DrawIndexedInstanced(numCubeIndices, 1, 0, 0, 0);
 
 	// second cube
 
 	// set cube2's constant buffer. You can see we are adding the size of ConstantBufferPerObject to the constant buffer
 	// resource heaps address. This is because cube1's constant buffer is stored at the beginning of the resource heap, while
 	// cube2's constant buffer data is stored after (256 bits from the start of the heap).
-	cm.GetCommandList()->SetGraphicsRootConstantBufferView(0, constantBufferUploadHeaps[frameIndex]->GetGPUVirtualAddress() + ConstantBufferPerObjectAlignedSize);
+	cm.GetCommand(L"first").GetCommandList()->SetGraphicsRootConstantBufferView(0, constantBufferUploadHeaps[frameIndex]->GetGPUVirtualAddress() + ConstantBufferPerObjectAlignedSize);
 
 	// draw second cube
-	cm.GetCommandList()->DrawIndexedInstanced(numCubeIndices, 1, 0, 0, 0);
+	cm.GetCommand(L"first").GetCommandList()->DrawIndexedInstanced(numCubeIndices, 1, 0, 0, 0);
 
 	// transition the "frameIndex" render target from the render target state to the present state. If the debug layer is enabled, you will receive a
 	// warning if present is called on the render target when it's not in the present state
-	cm.GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(descm.GetRTVDescriptor(L"first").GetRenderTarget(frameIndex).Get(),
+	cm.GetCommand(L"first").GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(descm.GetRTVDescriptor(L"first").GetRenderTarget(frameIndex).Get(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
-	hr = cm.GetCommandList()->Close();
+	hr = cm.GetCommand(L"first").GetCommandList()->Close();
 	if (FAILED(hr))
 	{
 		gWindowRunning = false;
@@ -844,7 +840,7 @@ void Render(CommandQueueManager& cqm,
 	UpdatePipeline(scm, descm, cm, fm); // update the pipeline by sending commands to the commandqueue
 
 	// create an array of command lists (only one command list here)
-	ComPtr<ID3D12CommandList> ppCommandLists[] = { cm.GetCommandList().Get() };
+	ComPtr<ID3D12CommandList> ppCommandLists[] = { cm.GetCommand(L"first").GetCommandList().Get() };
 
 	// execute the array of command lists
 	ComPtr<ID3D12CommandQueue> commandQueue = cqm.GetDirectCommandQueue();
