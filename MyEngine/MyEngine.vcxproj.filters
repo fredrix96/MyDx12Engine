@@ -57,6 +57,12 @@
     <ClInclude Include="command.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="rootSignatureManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="rootSignature.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="windowManager.cpp">
@@ -87,6 +93,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="command.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="rootSignatureManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="rootSignature.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

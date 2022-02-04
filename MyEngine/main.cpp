@@ -6,6 +6,7 @@
 #include "descriptorManager.h"
 #include "commandManager.h"
 #include "fenceManager.h"
+#include "rootSignatureManager.h"
 
 #pragma region globals
 
@@ -13,8 +14,6 @@
 int frameIndex; // current rtv we are on
 
 ComPtr<ID3D12PipelineState> pipelineStateObject; // pso containing a pipeline state
-
-ComPtr<ID3D12RootSignature> rootSignature; // root signature defines data shaders will access
 
 D3D12_VIEWPORT viewport; // area that output from rasterizer will be stretched to.
 
@@ -81,7 +80,7 @@ struct Vertex {
 
 void EnableDebugLayer(); // enable debug layer
 
-void mainloop(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& descm, CommandManager& cm, FenceManager& fm); // main application loop
+void mainloop(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& descm, CommandManager& cm, FenceManager& fm, RootSignatureManager& rsm); // main application loop
 
  // initializes direct3d 12
 bool InitD3D(WindowManager& window,
@@ -90,13 +89,14 @@ bool InitD3D(WindowManager& window,
 	SwapChainManager& scm,
 	DescriptorManager& descm,
 	CommandManager& cm,
-	FenceManager& fm);
+	FenceManager& fm,
+	RootSignatureManager& rsm);
 
 void Update(); // update the game logic
 
-void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm, CommandManager& cm, FenceManager& fm); // update the direct3d pipeline (update command lists)
+void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm, CommandManager& cm, FenceManager& fm, RootSignatureManager& rs); // update the direct3d pipeline (update command lists)
 
-void Render(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& descm, CommandManager& cm, FenceManager& fm); // execute the command list
+void Render(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& descm, CommandManager& cm, FenceManager& fm, RootSignatureManager& rsm); // execute the command list
 
 void Cleanup(SwapChainManager& scm, FenceManager& fm); // release com ojects and clean up memory
 
@@ -126,9 +126,10 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	DescriptorManager descm;
 	CommandManager cm;
 	FenceManager fm;
+	RootSignatureManager rsm;
 
 	// initialize direct3d
-	if (!InitD3D(mainWindow, dm, cqm, scm, descm, cm, fm))
+	if (!InitD3D(mainWindow, dm, cqm, scm, descm, cm, fm, rsm))
 	{
 		MessageBox(0, L"Failed to initialize direct3d 12", L"Error", MB_OK);
 		Cleanup(scm, fm);
@@ -136,7 +137,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	}
 
 	// start the main loop
-	mainloop(cqm, scm, descm, cm, fm);
+	mainloop(cqm, scm, descm, cm, fm, rsm);
 
 	// we want to wait for the gpu to finish executing the command list before we start releasing everything
 	WaitForPreviousFrame(scm, fm);
@@ -150,7 +151,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	return 0;
 }
 
-void mainloop(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& descm, CommandManager& cm, FenceManager& fm) {
+void mainloop(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& descm, CommandManager& cm, FenceManager& fm, RootSignatureManager& rsm) {
 	MSG msg;
 	ZeroMemory(&msg, sizeof(MSG));
 
@@ -167,7 +168,7 @@ void mainloop(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager
 		else {
 			// run game code
 			Update(); // update the game logic
-			Render(cqm, scm, descm, cm, fm); // execute the command queue (rendering the scene is the result of the gpu executing the command lists)
+			Render(cqm, scm, descm, cm, fm, rsm); // execute the command queue (rendering the scene is the result of the gpu executing the command lists)
 		}
 	}
 }
@@ -178,7 +179,8 @@ bool InitD3D(WindowManager& window,
 	SwapChainManager& scm,
 	DescriptorManager& descm,
 	CommandManager& cm,
-	FenceManager& fm)
+	FenceManager& fm,
+	RootSignatureManager& rsm)
 {
 	bool isCreated = false;
 
@@ -215,42 +217,10 @@ bool InitD3D(WindowManager& window,
 	isCreated = fm.CreateFences(dm.GetDevice().Get());
 	ASSERT(isCreated);
 
-	// create root signature
+	// -- Create Root Signature -- //
 
-	// create a root descriptor, which explains where to find the data for this root parameter
-	D3D12_ROOT_DESCRIPTOR rootCBVDescriptor;
-	rootCBVDescriptor.RegisterSpace = 0;
-	rootCBVDescriptor.ShaderRegister = 0;
-
-	// create a root parameter and fill it out
-	D3D12_ROOT_PARAMETER  rootParameters[1]; // only one parameter right now
-	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; // this is a constant buffer view root descriptor
-	rootParameters[0].Descriptor = rootCBVDescriptor; // this is the root descriptor for this root parameter
-	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX; // our pixel shader will be the only shader accessing this parameter for now
-
-	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-	rootSignatureDesc.Init(_countof(rootParameters), // we have 1 root parameter
-		rootParameters, // a pointer to the beginning of our root parameters array
-		0,
-		nullptr,
-		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | // we can deny shader stages here for better performance
-		D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
-		D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-		D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
-		D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS);
-
-	ComPtr<ID3DBlob> signature;
-	HRESULT hr = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, nullptr);
-	if (FAILED(hr))
-	{
-		return false;
-	}
-
-	hr = dm.GetDevice()->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
-	if (FAILED(hr))
-	{
-		return false;
-	}
+	isCreated = rsm.CreateRootSignature(dm.GetDevice().Get(), L"first");
+	ASSERT(isCreated);
 
 	// create vertex and pixel shaders
 
@@ -264,7 +234,7 @@ bool InitD3D(WindowManager& window,
 	// compile vertex shader
 	ComPtr<ID3DBlob> vertexShader; // d3d blob for holding vertex shader bytecode
 	ComPtr<ID3DBlob> errorBuff; // a buffer holding the error data if any
-	hr = D3DCompileFromFile(L"VertexShader.hlsl",
+	HRESULT hr = D3DCompileFromFile(L"VertexShader.hlsl",
 		nullptr,
 		nullptr,
 		"main",
@@ -339,7 +309,7 @@ bool InitD3D(WindowManager& window,
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {}; // a structure to define a pso
 	psoDesc.InputLayout = inputLayoutDesc; // the structure describing our input layout
-	psoDesc.pRootSignature = rootSignature.Get(); // the root signature that describes the input data this pso needs
+	psoDesc.pRootSignature = rsm.GetRootSignature(L"first").GetRootSignature().Get(); // the root signature that describes the input data this pso needs
 	psoDesc.VS = vertexShaderBytecode; // structure describing where to find the vertex shader bytecode and how large it is
 	psoDesc.PS = pixelShaderBytecode; // same as VS but for pixel shader
 	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE; // type of topology we are drawing
@@ -736,7 +706,7 @@ void Update()
 	XMStoreFloat4x4(&cube2WorldMat, worldMat);
 }
 
-void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm, CommandManager& cm, FenceManager& fm)
+void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm, CommandManager& cm, FenceManager& fm, RootSignatureManager& rsm)
 {
 	HRESULT hr;
 
@@ -790,7 +760,7 @@ void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm, CommandMana
 	cm.GetCommand(L"first").GetCommandList()->ClearDepthStencilView(dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 	// set root signature
-	cm.GetCommand(L"first").GetCommandList()->SetGraphicsRootSignature(rootSignature.Get()); // set the root signature
+	cm.GetCommand(L"first").GetCommandList()->SetGraphicsRootSignature(rsm.GetRootSignature(L"first").GetRootSignature().Get()); // set the root signature
 
 	// draw triangle
 	cm.GetCommand(L"first").GetCommandList()->RSSetViewports(1, &viewport); // set the viewports
@@ -833,11 +803,12 @@ void Render(CommandQueueManager& cqm,
 	SwapChainManager& scm,
 	DescriptorManager& descm,
 	CommandManager& cm,
-	FenceManager& fm)
+	FenceManager& fm,
+	RootSignatureManager& rsm)
 {
 	HRESULT hr;
 
-	UpdatePipeline(scm, descm, cm, fm); // update the pipeline by sending commands to the commandqueue
+	UpdatePipeline(scm, descm, cm, fm, rsm); // update the pipeline by sending commands to the commandqueue
 
 	// create an array of command lists (only one command list here)
 	ComPtr<ID3D12CommandList> ppCommandLists[] = { cm.GetCommand(L"first").GetCommandList().Get() };

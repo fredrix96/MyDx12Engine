@@ -151,6 +151,8 @@
     <ClInclude Include="deviceManager.h" />
     <ClInclude Include="dx.h" />
     <ClInclude Include="fenceManager.h" />
+    <ClInclude Include="rootSignature.h" />
+    <ClInclude Include="rootSignatureManager.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="swapChainManager.h" />
     <ClInclude Include="windowManager.h" />
@@ -164,6 +166,8 @@
     <ClCompile Include="deviceManager.cpp" />
     <ClCompile Include="fenceManager.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="rootSignature.cpp" />
+    <ClCompile Include="rootSignatureManager.cpp" />
     <ClCompile Include="swapChainManager.cpp" />
     <ClCompile Include="windowManager.cpp" />
   </ItemGroup>
