@@ -7,6 +7,7 @@
 #include "commandManager.h"
 #include "fenceManager.h"
 #include "rootSignatureManager.h"
+#include "shaderManager.h"
 
 #pragma region globals
 
@@ -90,7 +91,8 @@ bool InitD3D(WindowManager& window,
 	DescriptorManager& descm,
 	CommandManager& cm,
 	FenceManager& fm,
-	RootSignatureManager& rsm);
+	RootSignatureManager& rsm,
+	ShaderManager& sm);
 
 void Update(); // update the game logic
 
@@ -127,9 +129,10 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	CommandManager cm;
 	FenceManager fm;
 	RootSignatureManager rsm;
+	ShaderManager sm;
 
 	// initialize direct3d
-	if (!InitD3D(mainWindow, dm, cqm, scm, descm, cm, fm, rsm))
+	if (!InitD3D(mainWindow, dm, cqm, scm, descm, cm, fm, rsm, sm))
 	{
 		MessageBox(0, L"Failed to initialize direct3d 12", L"Error", MB_OK);
 		Cleanup(scm, fm);
@@ -180,7 +183,8 @@ bool InitD3D(WindowManager& window,
 	DescriptorManager& descm,
 	CommandManager& cm,
 	FenceManager& fm,
-	RootSignatureManager& rsm)
+	RootSignatureManager& rsm,
+	ShaderManager& sm)
 {
 	bool isCreated = false;
 
@@ -222,60 +226,16 @@ bool InitD3D(WindowManager& window,
 	isCreated = rsm.CreateRootSignature(dm.GetDevice().Get(), L"first");
 	ASSERT(isCreated);
 
-	// create vertex and pixel shaders
+	// -- Create Shaders -- //
 
-	// when debugging, we can compile the shader files at runtime.
+	// When debugging, we can compile the shader files at runtime.
 	// but for release versions, we can compile the hlsl shaders
 	// with fxc.exe to create .cso files, which contain the shader
 	// bytecode. We can load the .cso files at runtime to get the
 	// shader bytecode, which of course is faster than compiling
 	// them at runtime
 
-	// compile vertex shader
-	ComPtr<ID3DBlob> vertexShader; // d3d blob for holding vertex shader bytecode
-	ComPtr<ID3DBlob> errorBuff; // a buffer holding the error data if any
-	HRESULT hr = D3DCompileFromFile(L"VertexShader.hlsl",
-		nullptr,
-		nullptr,
-		"main",
-		"vs_5_0",
-		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
-		0,
-		&vertexShader,
-		&errorBuff);
-	if (FAILED(hr))
-	{
-		OutputDebugStringA((char*)errorBuff->GetBufferPointer());
-		return false;
-	}
-
-	// fill out a shader bytecode structure, which is basically just a pointer
-	// to the shader bytecode and the size of the shader bytecode
-	D3D12_SHADER_BYTECODE vertexShaderBytecode = {};
-	vertexShaderBytecode.BytecodeLength = vertexShader->GetBufferSize();
-	vertexShaderBytecode.pShaderBytecode = vertexShader->GetBufferPointer();
-
-	// compile pixel shader
-	ComPtr<ID3DBlob> pixelShader;
-	hr = D3DCompileFromFile(L"PixelShader.hlsl",
-		nullptr,
-		nullptr,
-		"main",
-		"ps_5_0",
-		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
-		0,
-		&pixelShader,
-		&errorBuff);
-	if (FAILED(hr))
-	{
-		OutputDebugStringA((char*)errorBuff->GetBufferPointer());
-		return false;
-	}
-
-	// fill out shader bytecode structure for pixel shader
-	D3D12_SHADER_BYTECODE pixelShaderBytecode = {};
-	pixelShaderBytecode.BytecodeLength = pixelShader->GetBufferSize();
-	pixelShaderBytecode.pShaderBytecode = pixelShader->GetBufferPointer();
+	sm.CreateGraphicsPipeline({ SHADER_TYPE::VERTEX, SHADER_TYPE::PIXEL }, L"first");
 
 	// create input layout
 
@@ -310,8 +270,8 @@ bool InitD3D(WindowManager& window,
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {}; // a structure to define a pso
 	psoDesc.InputLayout = inputLayoutDesc; // the structure describing our input layout
 	psoDesc.pRootSignature = rsm.GetRootSignature(L"first").GetRootSignature().Get(); // the root signature that describes the input data this pso needs
-	psoDesc.VS = vertexShaderBytecode; // structure describing where to find the vertex shader bytecode and how large it is
-	psoDesc.PS = pixelShaderBytecode; // same as VS but for pixel shader
+	psoDesc.VS = sm.GetGraphicsPipeline(L"first").at(SHADER_TYPE::VERTEX).GetShaderByteCode(); // structure describing where to find the vertex shader bytecode and how large it is
+	psoDesc.PS = sm.GetGraphicsPipeline(L"first").at(SHADER_TYPE::PIXEL).GetShaderByteCode(); // same as VS but for pixel shader
 	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE; // type of topology we are drawing
 	psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM; // format of the render target
 	psoDesc.SampleDesc = scm.GetSampleDesc(); // must be the same sample description as the swapchain and depth/stencil buffer
@@ -322,7 +282,7 @@ bool InitD3D(WindowManager& window,
 	psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT); // a default depth stencil state
 
 	// create the pso
-	hr = dm.GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineStateObject));
+	HRESULT hr = dm.GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineStateObject));
 	if (FAILED(hr))
 	{
 		return false;
@@ -644,9 +604,9 @@ void Update()
 	// update app logic, such as moving the camera or figuring out what objects are in view
 
 	// create rotation matrices
-	XMMATRIX rotXMat = XMMatrixRotationX(0.0001f);
-	XMMATRIX rotYMat = XMMatrixRotationY(0.0002f);
-	XMMATRIX rotZMat = XMMatrixRotationZ(0.0003f);
+	XMMATRIX rotXMat = XMMatrixRotationX(0.0002f);
+	XMMATRIX rotYMat = XMMatrixRotationY(0.0004f);
+	XMMATRIX rotZMat = XMMatrixRotationZ(0.0006f);
 
 	// add rotation to cube1's rotation matrix and store it
 	XMMATRIX rotMat = XMLoadFloat4x4(&cube1RotMat) * rotXMat * rotYMat * rotZMat;
@@ -674,9 +634,9 @@ void Update()
 
 	// now do cube2's world matrix
 	// create rotation matrices for cube2
-	rotXMat = XMMatrixRotationX(0.0003f);
-	rotYMat = XMMatrixRotationY(0.0002f);
-	rotZMat = XMMatrixRotationZ(0.0001f);
+	rotXMat = XMMatrixRotationX(0.0006f);
+	rotYMat = XMMatrixRotationY(0.0004f);
+	rotZMat = XMMatrixRotationZ(0.0002f);
 
 	// add rotation to cube2's rotation matrix and store it
 	rotMat = rotZMat * (XMLoadFloat4x4(&cube2RotMat) * (rotXMat * rotYMat));

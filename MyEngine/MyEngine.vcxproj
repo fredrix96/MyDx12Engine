@@ -153,6 +153,8 @@
     <ClInclude Include="fenceManager.h" />
     <ClInclude Include="rootSignature.h" />
     <ClInclude Include="rootSignatureManager.h" />
+    <ClInclude Include="shader.h" />
+    <ClInclude Include="shaderManager.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="swapChainManager.h" />
     <ClInclude Include="windowManager.h" />
@@ -168,11 +170,13 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="rootSignature.cpp" />
     <ClCompile Include="rootSignatureManager.cpp" />
+    <ClCompile Include="shader.cpp" />
+    <ClCompile Include="shaderManager.cpp" />
     <ClCompile Include="swapChainManager.cpp" />
     <ClCompile Include="windowManager.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="PixelShader.hlsl">
+    <FxCompile Include="PixelShader_first.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
@@ -182,7 +186,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </FxCompile>
-    <FxCompile Include="VertexShader.hlsl">
+    <FxCompile Include="VertexShader_first.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>

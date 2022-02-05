@@ -29,8 +29,15 @@
 using namespace DirectX; // we will be using the directxmath library
 using namespace Microsoft::WRL; // for stuff like ComPtrs
 
+static const std::string SHADER_LEVEL = "5_0";
+
 enum class DESCRIPTOR_TYPE {
     RTV
+};
+
+enum class SHADER_TYPE {
+    VERTEX,
+    PIXEL
 };
 
 #ifdef _DEBUG
