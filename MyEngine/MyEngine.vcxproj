@@ -90,6 +90,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -104,6 +105,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -118,6 +120,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -133,6 +136,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -151,10 +155,11 @@
     <ClInclude Include="deviceManager.h" />
     <ClInclude Include="dx.h" />
     <ClInclude Include="fenceManager.h" />
+    <ClInclude Include="pipelineStateObject.h" />
     <ClInclude Include="rootSignature.h" />
     <ClInclude Include="rootSignatureManager.h" />
     <ClInclude Include="shader.h" />
-    <ClInclude Include="shaderManager.h" />
+    <ClInclude Include="graphicsPipelineManager.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="swapChainManager.h" />
     <ClInclude Include="windowManager.h" />
@@ -168,10 +173,11 @@
     <ClCompile Include="deviceManager.cpp" />
     <ClCompile Include="fenceManager.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="pipelineStateObject.cpp" />
     <ClCompile Include="rootSignature.cpp" />
     <ClCompile Include="rootSignatureManager.cpp" />
     <ClCompile Include="shader.cpp" />
-    <ClCompile Include="shaderManager.cpp" />
+    <ClCompile Include="graphicsPipelineManager.cpp" />
     <ClCompile Include="swapChainManager.cpp" />
     <ClCompile Include="windowManager.cpp" />
   </ItemGroup>

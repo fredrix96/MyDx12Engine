@@ -7,14 +7,12 @@
 #include "commandManager.h"
 #include "fenceManager.h"
 #include "rootSignatureManager.h"
-#include "shaderManager.h"
+#include "graphicsPipelineManager.h"
 
 #pragma region globals
 
 // direct3d stuff
 int frameIndex; // current rtv we are on
-
-ComPtr<ID3D12PipelineState> pipelineStateObject; // pso containing a pipeline state
 
 D3D12_VIEWPORT viewport; // area that output from rasterizer will be stretched to.
 
@@ -81,7 +79,13 @@ struct Vertex {
 
 void EnableDebugLayer(); // enable debug layer
 
-void mainloop(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& descm, CommandManager& cm, FenceManager& fm, RootSignatureManager& rsm); // main application loop
+void mainloop(CommandQueueManager& cqm,
+	SwapChainManager& scm,
+	DescriptorManager& descm,
+	CommandManager& cm,
+	FenceManager& fm,
+	RootSignatureManager& rsm,
+	GraphicsPipelineManager& gpm); // main application loop
 
  // initializes direct3d 12
 bool InitD3D(WindowManager& window,
@@ -92,13 +96,24 @@ bool InitD3D(WindowManager& window,
 	CommandManager& cm,
 	FenceManager& fm,
 	RootSignatureManager& rsm,
-	ShaderManager& sm);
+	GraphicsPipelineManager& gpm);
 
 void Update(); // update the game logic
 
-void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm, CommandManager& cm, FenceManager& fm, RootSignatureManager& rs); // update the direct3d pipeline (update command lists)
+void UpdatePipeline(SwapChainManager& scm,
+	DescriptorManager& descm,
+	CommandManager& cm,
+	FenceManager& fm,
+	RootSignatureManager& rs,
+	GraphicsPipelineManager& gpm); // update the direct3d pipeline (update command lists)
 
-void Render(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& descm, CommandManager& cm, FenceManager& fm, RootSignatureManager& rsm); // execute the command list
+void Render(CommandQueueManager& cqm,
+	SwapChainManager& scm,
+	DescriptorManager& descm,
+	CommandManager& cm,
+	FenceManager& fm,
+	RootSignatureManager& rsm,
+	GraphicsPipelineManager& gpm); // execute the command list
 
 void Cleanup(SwapChainManager& scm, FenceManager& fm); // release com ojects and clean up memory
 
@@ -129,10 +144,10 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	CommandManager cm;
 	FenceManager fm;
 	RootSignatureManager rsm;
-	ShaderManager sm;
+	GraphicsPipelineManager gpm;
 
 	// initialize direct3d
-	if (!InitD3D(mainWindow, dm, cqm, scm, descm, cm, fm, rsm, sm))
+	if (!InitD3D(mainWindow, dm, cqm, scm, descm, cm, fm, rsm, gpm))
 	{
 		MessageBox(0, L"Failed to initialize direct3d 12", L"Error", MB_OK);
 		Cleanup(scm, fm);
@@ -140,7 +155,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	}
 
 	// start the main loop
-	mainloop(cqm, scm, descm, cm, fm, rsm);
+	mainloop(cqm, scm, descm, cm, fm, rsm, gpm);
 
 	// we want to wait for the gpu to finish executing the command list before we start releasing everything
 	WaitForPreviousFrame(scm, fm);
@@ -154,7 +169,14 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 	return 0;
 }
 
-void mainloop(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager& descm, CommandManager& cm, FenceManager& fm, RootSignatureManager& rsm) {
+void mainloop(CommandQueueManager& cqm,
+	SwapChainManager& scm,
+	DescriptorManager& descm,
+	CommandManager& cm,
+	FenceManager& fm,
+	RootSignatureManager& rsm,
+	GraphicsPipelineManager& gpm) 
+{
 	MSG msg;
 	ZeroMemory(&msg, sizeof(MSG));
 
@@ -171,7 +193,7 @@ void mainloop(CommandQueueManager& cqm, SwapChainManager& scm, DescriptorManager
 		else {
 			// run game code
 			Update(); // update the game logic
-			Render(cqm, scm, descm, cm, fm, rsm); // execute the command queue (rendering the scene is the result of the gpu executing the command lists)
+			Render(cqm, scm, descm, cm, fm, rsm, gpm); // execute the command queue (rendering the scene is the result of the gpu executing the command lists)
 		}
 	}
 }
@@ -184,7 +206,7 @@ bool InitD3D(WindowManager& window,
 	CommandManager& cm,
 	FenceManager& fm,
 	RootSignatureManager& rsm,
-	ShaderManager& sm)
+	GraphicsPipelineManager& gpm)
 {
 	bool isCreated = false;
 
@@ -235,9 +257,10 @@ bool InitD3D(WindowManager& window,
 	// shader bytecode, which of course is faster than compiling
 	// them at runtime
 
-	sm.CreateGraphicsPipeline({ SHADER_TYPE::VERTEX, SHADER_TYPE::PIXEL }, L"first");
+	isCreated = gpm.CreateGraphicsPipeline({ SHADER_TYPE::VERTEX, SHADER_TYPE::PIXEL }, L"first");
+	ASSERT(isCreated);
 
-	// create input layout
+	// -- Create Input Layout -- //
 
 	// The input layout is used by the Input Assembler so that it knows
 	// how to read the vertex data bound to it.
@@ -247,15 +270,9 @@ bool InitD3D(WindowManager& window,
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
 	};
+	int inputLayoutSize = sizeof(inputLayout) / sizeof(D3D12_INPUT_ELEMENT_DESC);
 
-	// fill out an input layout description structure
-	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = {};
-
-	// we can get the number of elements in an array by "sizeof(array) / sizeof(arrayElementType)"
-	inputLayoutDesc.NumElements = sizeof(inputLayout) / sizeof(D3D12_INPUT_ELEMENT_DESC);
-	inputLayoutDesc.pInputElementDescs = inputLayout;
-
-	// create a pipeline state object (PSO)
+	// -- Create a Pipeline State Object (PSO) -- //
 
 	// In a real application, you will have many pso's. for each different shader
 	// or different combinations of shaders, different blend states or different rasterizer states,
@@ -267,26 +284,12 @@ bool InitD3D(WindowManager& window,
 	// output, and not on a render target, which means you would not need anything after the stream
 	// output.
 
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {}; // a structure to define a pso
-	psoDesc.InputLayout = inputLayoutDesc; // the structure describing our input layout
-	psoDesc.pRootSignature = rsm.GetRootSignature(L"first").GetRootSignature().Get(); // the root signature that describes the input data this pso needs
-	psoDesc.VS = sm.GetGraphicsPipeline(L"first").at(SHADER_TYPE::VERTEX).GetShaderByteCode(); // structure describing where to find the vertex shader bytecode and how large it is
-	psoDesc.PS = sm.GetGraphicsPipeline(L"first").at(SHADER_TYPE::PIXEL).GetShaderByteCode(); // same as VS but for pixel shader
-	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE; // type of topology we are drawing
-	psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM; // format of the render target
-	psoDesc.SampleDesc = scm.GetSampleDesc(); // must be the same sample description as the swapchain and depth/stencil buffer
-	psoDesc.SampleMask = 0xffffffff; // sample mask has to do with multi-sampling. 0xffffffff means point sampling is done
-	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT); // a default rasterizer state.
-	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT); // a default blent state.
-	psoDesc.NumRenderTargets = 1; // we are only binding one render target
-	psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT); // a default depth stencil state
-
-	// create the pso
-	HRESULT hr = dm.GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelineStateObject));
-	if (FAILED(hr))
-	{
-		return false;
-	}
+	isCreated = gpm.CreatePSO(dm.GetDevice().Get(),
+		rsm.GetRootSignature(L"first").GetRootSignature().Get(),
+		scm.GetSampleDesc(),
+		{ inputLayout, inputLayoutSize },
+		L"first");
+	ASSERT(isCreated);
 
 	// Create vertex buffer
 
@@ -351,7 +354,7 @@ bool InitD3D(WindowManager& window,
 	// upload heaps are used to upload data to the GPU. CPU can write to it, GPU can read from it
 	// We will upload the vertex buffer using this heap to the default heap
 	ComPtr<ID3D12Resource> vBufferUploadHeap;
-	hr = dm.GetDevice()->CreateCommittedResource(
+	HRESULT hr = dm.GetDevice()->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), // upload heap
 		D3D12_HEAP_FLAG_NONE, // no flags
 		&CD3DX12_RESOURCE_DESC::Buffer(vBufferSize), // resource description for a buffer
@@ -666,7 +669,7 @@ void Update()
 	XMStoreFloat4x4(&cube2WorldMat, worldMat);
 }
 
-void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm, CommandManager& cm, FenceManager& fm, RootSignatureManager& rsm)
+void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm, CommandManager& cm, FenceManager& fm, RootSignatureManager& rsm, GraphicsPipelineManager& gpm)
 {
 	HRESULT hr;
 
@@ -691,7 +694,10 @@ void UpdatePipeline(SwapChainManager& scm, DescriptorManager& descm, CommandMana
 	// but in this tutorial we are only clearing the rtv, and do not actually need
 	// anything but an initial default pipeline, which is what we get by setting
 	// the second parameter to NULL
-	hr = cm.GetCommand(L"first").GetCommandList()->Reset(cm.GetCommand(L"first").GetCommandAllocator(frameIndex).Get(), pipelineStateObject.Get());
+	hr = cm.GetCommand(L"first").GetCommandList()->Reset(
+		cm.GetCommand(L"first").GetCommandAllocator(frameIndex).Get(),
+		gpm.GetPSO(L"first").GetPSO().Get()
+	);
 	if (FAILED(hr))
 	{
 		gWindowRunning = false;
@@ -764,11 +770,12 @@ void Render(CommandQueueManager& cqm,
 	DescriptorManager& descm,
 	CommandManager& cm,
 	FenceManager& fm,
-	RootSignatureManager& rsm)
+	RootSignatureManager& rsm,
+	GraphicsPipelineManager& gpm)
 {
 	HRESULT hr;
 
-	UpdatePipeline(scm, descm, cm, fm, rsm); // update the pipeline by sending commands to the commandqueue
+	UpdatePipeline(scm, descm, cm, fm, rsm, gpm); // update the pipeline by sending commands to the commandqueue
 
 	// create an array of command lists (only one command list here)
 	ComPtr<ID3D12CommandList> ppCommandLists[] = { cm.GetCommand(L"first").GetCommandList().Get() };
