@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <windowsx.h>
+#include "stdafx.h"
 
 bool static gWindowRunning = true; //TODO: Come up with something better
 
@@ -26,6 +27,7 @@ private:
 
 public:
 
+	WindowManager(); // default
 	WindowManager(HINSTANCE hInstance,
 		int nShowCmd,
 		int width, int height,

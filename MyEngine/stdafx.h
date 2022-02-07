@@ -40,6 +40,12 @@ enum class SHADER_TYPE {
     PIXEL
 };
 
+struct Vertex {
+    Vertex(float x, float y, float z, float r, float g, float b, float a) : pos(x, y, z), color(r, g, b, a) {}
+    XMFLOAT3 pos;
+    XMFLOAT4 color;
+};
+
 #ifdef _DEBUG
 #define ASSERT(expression)                                  \
     if(!(expression))                                       \

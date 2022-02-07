@@ -13,11 +13,20 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Shaders">
-      <UniqueIdentifier>{ae461830-e3ee-475c-97c5-24cd1ffc9707}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Main">
       <UniqueIdentifier>{bb1447a4-9aa3-464c-a986-ca0654c1048d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DirectX12">
+      <UniqueIdentifier>{4850146e-76ab-49d1-a112-cbb2b71140ad}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DirectX12\Header files">
+      <UniqueIdentifier>{179ca9b8-7596-4581-9cfd-9fcfb18e5bd4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DirectX12\Source Files">
+      <UniqueIdentifier>{e7f40f13-4f26-45ea-a176-654f2939ef92}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DirectX12\Shaders">
+      <UniqueIdentifier>{ae461830-e3ee-475c-97c5-24cd1ffc9707}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -30,102 +39,108 @@
     <ClInclude Include="stdafx.h">
       <Filter>Resource Files</Filter>
     </ClInclude>
-    <ClInclude Include="commandManager.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="commandQueueManager.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="descriptor.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="descriptorManager.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="deviceManager.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="swapChainManager.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="windowManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="fenceManager.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="Dx12Engine.h">
+      <Filter>DirectX12</Filter>
     </ClInclude>
     <ClInclude Include="command.h">
-      <Filter>Header Files</Filter>
+      <Filter>DirectX12\Header files</Filter>
     </ClInclude>
-    <ClInclude Include="rootSignatureManager.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="commandManager.h">
+      <Filter>DirectX12\Header files</Filter>
     </ClInclude>
-    <ClInclude Include="rootSignature.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="descriptor.h">
+      <Filter>DirectX12\Header files</Filter>
     </ClInclude>
-    <ClInclude Include="shader.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="commandQueueManager.h">
+      <Filter>DirectX12\Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="descriptorManager.h">
+      <Filter>DirectX12\Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="deviceManager.h">
+      <Filter>DirectX12\Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="fenceManager.h">
+      <Filter>DirectX12\Header files</Filter>
     </ClInclude>
     <ClInclude Include="graphicsPipelineManager.h">
-      <Filter>Header Files</Filter>
+      <Filter>DirectX12\Header files</Filter>
     </ClInclude>
     <ClInclude Include="pipelineStateObject.h">
-      <Filter>Header Files</Filter>
+      <Filter>DirectX12\Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="rootSignature.h">
+      <Filter>DirectX12\Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="rootSignatureManager.h">
+      <Filter>DirectX12\Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="shader.h">
+      <Filter>DirectX12\Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="swapChainManager.h">
+      <Filter>DirectX12\Header files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="windowManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="deviceManager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="commandQueueManager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="swapChainManager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="descriptorManager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="descriptor.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="commandManager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="main.cpp">
       <Filter>Main</Filter>
     </ClCompile>
-    <ClCompile Include="fenceManager.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="Dx12Engine.cpp">
+      <Filter>DirectX12</Filter>
     </ClCompile>
     <ClCompile Include="command.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>DirectX12\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="rootSignatureManager.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="commandManager.cpp">
+      <Filter>DirectX12\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="rootSignature.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="commandQueueManager.cpp">
+      <Filter>DirectX12\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="shader.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="descriptor.cpp">
+      <Filter>DirectX12\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="deviceManager.cpp">
+      <Filter>DirectX12\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="descriptorManager.cpp">
+      <Filter>DirectX12\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="fenceManager.cpp">
+      <Filter>DirectX12\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="graphicsPipelineManager.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>DirectX12\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="pipelineStateObject.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>DirectX12\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="rootSignature.cpp">
+      <Filter>DirectX12\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="rootSignatureManager.cpp">
+      <Filter>DirectX12\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="shader.cpp">
+      <Filter>DirectX12\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="swapChainManager.cpp">
+      <Filter>DirectX12\Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="VertexShader_first.hlsl">
-      <Filter>Shaders</Filter>
+      <Filter>DirectX12\Shaders</Filter>
     </FxCompile>
     <FxCompile Include="PixelShader_first.hlsl">
-      <Filter>Shaders</Filter>
+      <Filter>DirectX12\Shaders</Filter>
     </FxCompile>
   </ItemGroup>
 </Project>

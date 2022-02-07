@@ -5,7 +5,8 @@ LRESULT WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{
 	case WM_KEYDOWN:
-		if (wParam == VK_ESCAPE) {
+		if (wParam == VK_ESCAPE) 
+		{
 			if (MessageBox(0, L"Are you sure you want to exit?",
 				L"Really?", MB_YESNO | MB_ICONQUESTION) == IDYES)
 			{
@@ -30,8 +31,7 @@ bool WindowManager::initializeWindow(HINSTANCE hInstance, int showWnd)
 {
 	if (mFullscreen)
 	{
-		HMONITOR hmon = MonitorFromWindow(mHwnd,
-			MONITOR_DEFAULTTONEAREST);
+		HMONITOR hmon = MonitorFromWindow(mHwnd, MONITOR_DEFAULTTONEAREST);
 		MONITORINFO mi = { sizeof(mi) };
 		GetMonitorInfo(hmon, &mi);
 
@@ -85,6 +85,12 @@ bool WindowManager::initializeWindow(HINSTANCE hInstance, int showWnd)
 	UpdateWindow(mHwnd);
 
 	return true;
+}
+
+WindowManager::WindowManager() : 
+	mHwnd(NULL), mWindowName(L""), mWindowTitle(L""), mWidth(DEFAULT_VALUE), mHeight(DEFAULT_VALUE), mFullscreen(false), mWindowCreated(false)
+{
+	// Initialization with default values
 }
 
 WindowManager::WindowManager(HINSTANCE hInstance, int nShowCmd, int width, int height, bool fullscreen, LPCTSTR name, LPCTSTR title)

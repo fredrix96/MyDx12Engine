@@ -154,6 +154,7 @@
     <ClInclude Include="descriptorManager.h" />
     <ClInclude Include="deviceManager.h" />
     <ClInclude Include="dx.h" />
+    <ClInclude Include="Dx12Engine.h" />
     <ClInclude Include="fenceManager.h" />
     <ClInclude Include="pipelineStateObject.h" />
     <ClInclude Include="rootSignature.h" />
@@ -171,6 +172,7 @@
     <ClCompile Include="descriptor.cpp" />
     <ClCompile Include="descriptorManager.cpp" />
     <ClCompile Include="deviceManager.cpp" />
+    <ClCompile Include="Dx12Engine.cpp" />
     <ClCompile Include="fenceManager.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="pipelineStateObject.cpp" />
