@@ -47,7 +47,7 @@ bool Dx12Engine::Initialize()
 		ASSERT(false);
 		return false;
 	}
-	
+
 	bool isCreated = false;
 
 	// -- Create the Device -- //
@@ -70,12 +70,12 @@ bool Dx12Engine::Initialize()
 
 	// -- Create the Back Buffers (render target views) Descriptor Heap -- //
 
-	isCreated = mDescMan.CreateRTVDescriptorHeap(mDevMan.GetDevice().Get(), mSwapChainMan.GetSwapChain().Get(), L"first");
+	isCreated = mDescMan.CreateRTVDescriptorHeap(mDevMan.GetDevice().Get(), mSwapChainMan.GetSwapChain().Get(), first);
 	ASSERT(isCreated);
 
 	// -- Create the Command Allocators -- And -- Create a Command List --//
 
-	isCreated = mComMan.CreateCommand(mDevMan.GetDevice().Get(), frameIndex, L"first");
+	isCreated = mComMan.CreateCommand(mDevMan.GetDevice().Get(), frameIndex, first);
 	ASSERT(isCreated);
 
 	// -- Create a Fence & Fence Event -- //
@@ -85,7 +85,7 @@ bool Dx12Engine::Initialize()
 
 	// -- Create Root Signature -- //
 
-	isCreated = mRootSignMan.CreateRootSignature(mDevMan.GetDevice().Get(), L"first");
+	isCreated = mRootSignMan.CreateRootSignature(mDevMan.GetDevice().Get(), first);
 	ASSERT(isCreated);
 
 	// -- Create Shaders -- //
@@ -97,7 +97,7 @@ bool Dx12Engine::Initialize()
 	// shader bytecode, which of course is faster than compiling
 	// them at runtime
 
-	isCreated = mGraphPipeMan.CreateGraphicsPipeline({ SHADER_TYPE::VERTEX, SHADER_TYPE::PIXEL }, L"first");
+	isCreated = mGraphPipeMan.CreateGraphicsPipeline({ SHADER_TYPE::VERTEX, SHADER_TYPE::PIXEL }, first);
 	ASSERT(isCreated);
 
 	// -- Create Input Layout -- //
@@ -125,13 +125,13 @@ bool Dx12Engine::Initialize()
 	// output.
 
 	isCreated = mGraphPipeMan.CreatePSO(mDevMan.GetDevice().Get(),
-		mRootSignMan.GetRootSignature(L"first").GetRootSignature().Get(),
+		mRootSignMan.GetRootSignature(first).GetRootSignature().Get(),
 		mSwapChainMan.GetSampleDesc(),
 		{ inputLayout, inputLayoutSize },
-		L"first");
+		first);
 	ASSERT(isCreated);
 
-	// Create vertex buffer
+	// -- Create Vertex Buffer -- //
 
 	// a quad
 	Vertex vList[] = {
@@ -174,53 +174,16 @@ bool Dx12Engine::Initialize()
 
 	int vBufferSize = sizeof(vList);
 
-	// create default heap
-	// default heap is memory on the GPU. Only the GPU has access to this memory
-	// To get data into this heap, we will have to upload the data using
-	// an upload heap
-	mDevMan.GetDevice()->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), // a default heap
-		D3D12_HEAP_FLAG_NONE, // no flags
-		&CD3DX12_RESOURCE_DESC::Buffer(vBufferSize), // resource description for a buffer
-		D3D12_RESOURCE_STATE_COPY_DEST, // we will start this heap in the copy destination state since we will copy data
-										// from the upload heap to this heap
-		nullptr, // optimized clear value must be null for this type of resource. used for render targets and depth/stencil buffers
-		IID_PPV_ARGS(&vertexBuffer));
-
-	// we can give resource heaps a name so when we debug with the graphics debugger we know what resource we are looking at
-	vertexBuffer->SetName(L"Vertex Buffer Resource Heap");
-
-	// create upload heap
-	// upload heaps are used to upload data to the GPU. CPU can write to it, GPU can read from it
-	// We will upload the vertex buffer using this heap to the default heap
-	ComPtr<ID3D12Resource> vBufferUploadHeap;
-	HRESULT hr = mDevMan.GetDevice()->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), // upload heap
-		D3D12_HEAP_FLAG_NONE, // no flags
-		&CD3DX12_RESOURCE_DESC::Buffer(vBufferSize), // resource description for a buffer
-		D3D12_RESOURCE_STATE_GENERIC_READ, // GPU will read from this buffer and copy its contents to the default heap
-		nullptr,
-		IID_PPV_ARGS(&vBufferUploadHeap));
-	if (FAILED(hr))
-	{
-		return false;
-	}
-	vBufferUploadHeap->SetName(L"Vertex Buffer Upload Resource Heap");
-
-	// store vertex buffer in upload heap
-	D3D12_SUBRESOURCE_DATA vertexData = {};
-	vertexData.pData = reinterpret_cast<BYTE*>(vList); // pointer to our vertex array
-	vertexData.RowPitch = vBufferSize; // size of all our triangle vertex data
-	vertexData.SlicePitch = vBufferSize; // also the size of our triangle vertex data
-
-	// we are now creating a command with the command list to copy the data from
-	// the upload heap to the default heap
-	UpdateSubresources(mComMan.GetCommand(L"first").GetCommandList().Get(), vertexBuffer.Get(), vBufferUploadHeap.Get(), 0, 0, 1, &vertexData);
+	isCreated = mD3DContextMan.CreateVertexBuffer(mDevMan.GetDevice().Get(), { vList, vBufferSize }, mComMan.GetCommand(first).GetCommandList().Get(), first);
+	ASSERT(isCreated);
 
 	// transition the vertex buffer data from copy destination state to vertex buffer state
-	mComMan.GetCommand(L"first").GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(vertexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+	mComMan.GetCommand(first).GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+		mD3DContextMan.GetVertexBuffer(first).GetBufferResource().Get(),
+		D3D12_RESOURCE_STATE_COPY_DEST,
+		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 
-	// Create index buffer
+	// -- Create Index Buffer -- //
 
 	// a quad (2 triangles)
 	DWORD iList[] = {
@@ -251,48 +214,15 @@ bool Dx12Engine::Initialize()
 
 	int iBufferSize = sizeof(iList);
 
-	numCubeIndices = sizeof(iList) / sizeof(DWORD);
+	isCreated = mD3DContextMan.CreateIndexBuffer(mDevMan.GetDevice().Get(), { iList, iBufferSize }, mComMan.GetCommand(first).GetCommandList().Get(), first);
+	ASSERT(isCreated);
 
-	// create default heap to hold index buffer
-	mDevMan.GetDevice()->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), // a default heap
-		D3D12_HEAP_FLAG_NONE, // no flags
-		&CD3DX12_RESOURCE_DESC::Buffer(iBufferSize), // resource description for a buffer
-		D3D12_RESOURCE_STATE_COPY_DEST, // start in the copy destination state
-		nullptr, // optimized clear value must be null for this type of resource
-		IID_PPV_ARGS(&indexBuffer));
+	// transition the index buffer data from copy destination state to vertex buffer state
+	mComMan.GetCommand(first).GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+		mD3DContextMan.GetIndexBuffer(first).GetBufferResource().Get(),
+		D3D12_RESOURCE_STATE_COPY_DEST,
+		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 
-	// we can give resource heaps a name so when we debug with the graphics debugger we know what resource we are looking at
-	vertexBuffer->SetName(L"Index Buffer Resource Heap");
-
-	// create upload heap to upload index buffer
-	ComPtr<ID3D12Resource> iBufferUploadHeap;
-	hr = mDevMan.GetDevice()->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), // upload heap
-		D3D12_HEAP_FLAG_NONE, // no flags
-		&CD3DX12_RESOURCE_DESC::Buffer(vBufferSize), // resource description for a buffer
-		D3D12_RESOURCE_STATE_GENERIC_READ, // GPU will read from this buffer and copy its contents to the default heap
-		nullptr,
-		IID_PPV_ARGS(&iBufferUploadHeap));
-	if (FAILED(hr))
-	{
-		return false;
-	}
-	vBufferUploadHeap->SetName(L"Index Buffer Upload Resource Heap");
-
-	// store vertex buffer in upload heap
-	D3D12_SUBRESOURCE_DATA indexData = {};
-	indexData.pData = reinterpret_cast<BYTE*>(iList); // pointer to our index array
-	indexData.RowPitch = iBufferSize; // size of all our index buffer
-	indexData.SlicePitch = iBufferSize; // also the size of our index buffer
-
-	// we are now creating a command with the command list to copy the data from
-	// the upload heap to the default heap
-	UpdateSubresources(mComMan.GetCommand(L"first").GetCommandList().Get(), indexBuffer.Get(), iBufferUploadHeap.Get(), 0, 0, 1, &indexData);
-
-	// transition the vertex buffer data from copy destination state to vertex buffer state
-	mComMan.GetCommand(L"first").GetCommandList()->ResourceBarrier(1,
-		&CD3DX12_RESOURCE_BARRIER::Transition(indexBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 
 	// Create the depth/stencil buffer
 
@@ -301,7 +231,7 @@ bool Dx12Engine::Initialize()
 	dsvHeapDesc.NumDescriptors = 1;
 	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	hr = mDevMan.GetDevice()->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&dsDescriptorHeap));
+	HRESULT hr = mDevMan.GetDevice()->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&dsDescriptorHeap));
 	if (FAILED(hr))
 	{
 		gWindowRunning = false;
@@ -369,8 +299,8 @@ bool Dx12Engine::Initialize()
 	}
 
 	// Now we execute the command list to upload the initial assets (triangle data)
-	mComMan.GetCommand(L"first").GetCommandList()->Close();
-	ComPtr<ID3D12CommandList> ppCommandLists[] = { mComMan.GetCommand(L"first").GetCommandList().Get() };
+	mComMan.GetCommand(first).GetCommandList()->Close();
+	ComPtr<ID3D12CommandList> ppCommandLists[] = { mComMan.GetCommand(first).GetCommandList().Get() };
 	mComQueMan.GetDirectCommandQueue()->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists->GetAddressOf());
 
 	// increment the fence value now, otherwise the buffer might not be uploaded by the time we start drawing
@@ -380,16 +310,6 @@ bool Dx12Engine::Initialize()
 	{
 		gWindowRunning = false;
 	}
-
-	// create a vertex buffer view for the triangle. We get the GPU memory address to the vertex pointer using the GetGPUVirtualAddress() method
-	vertexBufferView.BufferLocation = vertexBuffer->GetGPUVirtualAddress();
-	vertexBufferView.StrideInBytes = sizeof(Vertex);
-	vertexBufferView.SizeInBytes = vBufferSize;
-
-	// create a vertex buffer view for the triangle. We get the GPU memory address to the vertex pointer using the GetGPUVirtualAddress() method
-	indexBufferView.BufferLocation = indexBuffer->GetGPUVirtualAddress();
-	indexBufferView.Format = DXGI_FORMAT_R32_UINT; // 32-bit unsigned integer (this is what a dword is, double word, a word is 2 bytes)
-	indexBufferView.SizeInBytes = iBufferSize;
 
 	// Fill out the Viewport
 	viewport.TopLeftX = 0;
@@ -451,7 +371,7 @@ void Dx12Engine::UpdatePipeline()
 
 	// we can only reset an allocator once the gpu is done with it
 	// resetting an allocator frees the memory that the command list was stored in
-	hr = mComMan.GetCommand(L"first").GetCommandAllocator(frameIndex)->Reset();
+	hr = mComMan.GetCommand(first).GetCommandAllocator(frameIndex)->Reset();
 	if (FAILED(hr))
 	{
 		gWindowRunning = false;
@@ -467,9 +387,9 @@ void Dx12Engine::UpdatePipeline()
 	// but in this tutorial we are only clearing the rtv, and do not actually need
 	// anything but an initial default pipeline, which is what we get by setting
 	// the second parameter to NULL
-	hr = mComMan.GetCommand(L"first").GetCommandList()->Reset(
-		mComMan.GetCommand(L"first").GetCommandAllocator(frameIndex).Get(),
-		mGraphPipeMan.GetPSO(L"first").GetPSO().Get()
+	hr = mComMan.GetCommand(first).GetCommandList()->Reset(
+		mComMan.GetCommand(first).GetCommandAllocator(frameIndex).Get(),
+		mGraphPipeMan.GetPSO(first).GetPSO().Get()
 	);
 	if (FAILED(hr))
 	{
@@ -479,59 +399,64 @@ void Dx12Engine::UpdatePipeline()
 	// here we start recording commands into the commandList (which all the commands will be stored in the commandAllocator)
 
 	// transition the "frameIndex" render target from the present state to the render target state so the command list draws to it starting from here
-	mComMan.GetCommand(L"first").GetCommandList()->ResourceBarrier(1,
-		&CD3DX12_RESOURCE_BARRIER::Transition(mDescMan.GetRTVDescriptor(L"first").GetRenderTarget(frameIndex).Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+	mComMan.GetCommand(first).GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+		mDescMan.GetRTVDescriptor(first).GetRenderTarget(frameIndex).Get(),
+		D3D12_RESOURCE_STATE_PRESENT,
+		D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 	// here we again get the handle to our current render target view so we can set it as the render target in the output merger stage of the pipeline
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle = mDescMan.GetRTVDescriptor(L"first").GetHandle(frameIndex);
+	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle = mDescMan.GetRTVDescriptor(first).GetHandle(frameIndex);
 
 	// get a handle to the depth/stencil buffer
 	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
 	// set the render target for the output merger stage (the output of the pipeline)
-	mComMan.GetCommand(L"first").GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+	mComMan.GetCommand(first).GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
 
 	// Clear the render target by using the ClearRenderTargetView command
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-	mComMan.GetCommand(L"first").GetCommandList()->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+	mComMan.GetCommand(first).GetCommandList()->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
 	// clear the depth/stencil buffer
-	mComMan.GetCommand(L"first").GetCommandList()->ClearDepthStencilView(dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+	mComMan.GetCommand(first).GetCommandList()->ClearDepthStencilView(dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 	// set root signature
-	mComMan.GetCommand(L"first").GetCommandList()->SetGraphicsRootSignature(mRootSignMan.GetRootSignature(L"first").GetRootSignature().Get()); // set the root signature
+	mComMan.GetCommand(first).GetCommandList()->SetGraphicsRootSignature(mRootSignMan.GetRootSignature(first).GetRootSignature().Get()); // set the root signature
 
 	// draw triangle
-	mComMan.GetCommand(L"first").GetCommandList()->RSSetViewports(1, &viewport); // set the viewports
-	mComMan.GetCommand(L"first").GetCommandList()->RSSetScissorRects(1, &scissorRect); // set the scissor rects
-	mComMan.GetCommand(L"first").GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST); // set the primitive topology
-	mComMan.GetCommand(L"first").GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView); // set the vertex buffer (using the vertex buffer view)
-	mComMan.GetCommand(L"first").GetCommandList()->IASetIndexBuffer(&indexBufferView);
+	mComMan.GetCommand(first).GetCommandList()->RSSetViewports(1, &viewport); // set the viewports
+	mComMan.GetCommand(first).GetCommandList()->RSSetScissorRects(1, &scissorRect); // set the scissor rects
+	mComMan.GetCommand(first).GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST); // set the primitive topology
+	mComMan.GetCommand(first).GetCommandList()->IASetVertexBuffers(0, 1, &mD3DContextMan.GetVertexBuffer(first).GetVertexBufferView()); // set the vertex buffer (using the vertex buffer view)
+	mComMan.GetCommand(first).GetCommandList()->IASetIndexBuffer(&mD3DContextMan.GetIndexBuffer(first).GetIndexBufferView());
 
 	// first cube
 
 	// set cube1's constant buffer
-	mComMan.GetCommand(L"first").GetCommandList()->SetGraphicsRootConstantBufferView(0, constantBufferUploadHeaps[frameIndex]->GetGPUVirtualAddress());
+	mComMan.GetCommand(first).GetCommandList()->SetGraphicsRootConstantBufferView(0, constantBufferUploadHeaps[frameIndex]->GetGPUVirtualAddress());
 
 	// draw first cube
-	mComMan.GetCommand(L"first").GetCommandList()->DrawIndexedInstanced(numCubeIndices, 1, 0, 0, 0);
+	mComMan.GetCommand(first).GetCommandList()->DrawIndexedInstanced(mD3DContextMan.GetIndexBuffer(first).GetNumOfIndices(), 1, 0, 0, 0);
 
 	// second cube
 
 	// set cube2's constant buffer. You can see we are adding the size of ConstantBufferPerObject to the constant buffer
 	// resource heaps address. This is because cube1's constant buffer is stored at the beginning of the resource heap, while
 	// cube2's constant buffer data is stored after (256 bits from the start of the heap).
-	mComMan.GetCommand(L"first").GetCommandList()->SetGraphicsRootConstantBufferView(0, constantBufferUploadHeaps[frameIndex]->GetGPUVirtualAddress() + ConstantBufferPerObjectAlignedSize);
+	mComMan.GetCommand(first).GetCommandList()->SetGraphicsRootConstantBufferView(0,
+		constantBufferUploadHeaps[frameIndex]->GetGPUVirtualAddress() + ConstantBufferPerObjectAlignedSize);
 
 	// draw second cube
-	mComMan.GetCommand(L"first").GetCommandList()->DrawIndexedInstanced(numCubeIndices, 1, 0, 0, 0);
+	mComMan.GetCommand(first).GetCommandList()->DrawIndexedInstanced(mD3DContextMan.GetIndexBuffer(first).GetNumOfIndices(), 1, 0, 0, 0);
 
 	// transition the "frameIndex" render target from the render target state to the present state. If the debug layer is enabled, you will receive a
 	// warning if present is called on the render target when it's not in the present state
-	mComMan.GetCommand(L"first").GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDescMan.GetRTVDescriptor(L"first").GetRenderTarget(frameIndex).Get(),
-		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+	mComMan.GetCommand(first).GetCommandList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+		mDescMan.GetRTVDescriptor(first).GetRenderTarget(frameIndex).Get(),
+		D3D12_RESOURCE_STATE_RENDER_TARGET,
+		D3D12_RESOURCE_STATE_PRESENT));
 
-	hr = mComMan.GetCommand(L"first").GetCommandList()->Close();
+	hr = mComMan.GetCommand(first).GetCommandList()->Close();
 	if (FAILED(hr))
 	{
 		gWindowRunning = false;
@@ -572,7 +497,7 @@ void Dx12Engine::Render()
 	UpdatePipeline(); // update the pipeline by sending commands to the commandqueue
 
 	// create an array of command lists (only one command list here)
-	ComPtr<ID3D12CommandList> ppCommandLists[] = { mComMan.GetCommand(L"first").GetCommandList().Get() };
+	ComPtr<ID3D12CommandList> ppCommandLists[] = { mComMan.GetCommand(first).GetCommandList().Get() };
 
 	// execute the array of command lists
 	ComPtr<ID3D12CommandQueue> commandQueue = mComQueMan.GetDirectCommandQueue();

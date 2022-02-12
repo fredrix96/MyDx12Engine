@@ -84,6 +84,18 @@
     <ClInclude Include="swapChainManager.h">
       <Filter>DirectX12\Header files</Filter>
     </ClInclude>
+    <ClInclude Include="GPUResource.h">
+      <Filter>DirectX12\Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="vertexBuffer.h">
+      <Filter>DirectX12\Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="direct3DContextManager.h">
+      <Filter>DirectX12\Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="indexBuffer.h">
+      <Filter>DirectX12\Header files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="windowManager.cpp">
@@ -133,6 +145,18 @@
     </ClCompile>
     <ClCompile Include="swapChainManager.cpp">
       <Filter>DirectX12\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GPUResource.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vertexBuffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="direct3DContextManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="indexBuffer.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

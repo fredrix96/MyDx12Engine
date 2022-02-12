@@ -146,6 +146,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="direct3DContextManager.h" />
     <ClInclude Include="command.h" />
     <ClInclude Include="commandManager.h" />
     <ClInclude Include="commandQueueManager.h" />
@@ -156,6 +157,8 @@
     <ClInclude Include="dx.h" />
     <ClInclude Include="Dx12Engine.h" />
     <ClInclude Include="fenceManager.h" />
+    <ClInclude Include="GPUResource.h" />
+    <ClInclude Include="indexBuffer.h" />
     <ClInclude Include="pipelineStateObject.h" />
     <ClInclude Include="rootSignature.h" />
     <ClInclude Include="rootSignatureManager.h" />
@@ -163,6 +166,7 @@
     <ClInclude Include="graphicsPipelineManager.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="swapChainManager.h" />
+    <ClInclude Include="vertexBuffer.h" />
     <ClInclude Include="windowManager.h" />
   </ItemGroup>
   <ItemGroup>
@@ -172,8 +176,11 @@
     <ClCompile Include="descriptor.cpp" />
     <ClCompile Include="descriptorManager.cpp" />
     <ClCompile Include="deviceManager.cpp" />
+    <ClCompile Include="direct3DContextManager.cpp" />
     <ClCompile Include="Dx12Engine.cpp" />
     <ClCompile Include="fenceManager.cpp" />
+    <ClCompile Include="GPUResource.cpp" />
+    <ClCompile Include="indexBuffer.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="pipelineStateObject.cpp" />
     <ClCompile Include="rootSignature.cpp" />
@@ -181,6 +188,7 @@
     <ClCompile Include="shader.cpp" />
     <ClCompile Include="graphicsPipelineManager.cpp" />
     <ClCompile Include="swapChainManager.cpp" />
+    <ClCompile Include="vertexBuffer.cpp" />
     <ClCompile Include="windowManager.cpp" />
   </ItemGroup>
   <ItemGroup>

@@ -10,6 +10,7 @@
 #include "fenceManager.h"
 #include "rootSignatureManager.h"
 #include "graphicsPipelineManager.h"
+#include "direct3DContextManager.h"
 
 class Dx12Engine
 {
@@ -24,9 +25,13 @@ private:
 	FenceManager mFenceMan;
 	RootSignatureManager mRootSignMan;
 	GraphicsPipelineManager mGraphPipeMan;
+	Direct3DContextManager mD3DContextMan;
 
 	int frameIndex; // current rtv we are on
 	bool mIsInitialized;
+
+	//tmp first creation name
+	std::wstring first = L"first";
 
 	void waitForPreviousFrame(); // wait until gpu is finished with command list
 
@@ -37,14 +42,6 @@ private:
 	D3D12_VIEWPORT viewport; // area that output from rasterizer will be stretched to.
 
 	D3D12_RECT scissorRect; // the area to draw in. pixels outside that area will not be drawn onto
-
-	ComPtr<ID3D12Resource> vertexBuffer; // a default buffer in GPU memory that we will load vertex data for our triangle into
-	ComPtr<ID3D12Resource> indexBuffer; // a default buffer in GPU memory that we will load index data for our triangle into
-
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView; // a structure containing a pointer to the vertex data in gpu memory
-											   // the total size of the buffer, and the size of each element (vertex)
-
-	D3D12_INDEX_BUFFER_VIEW indexBufferView; // a structure holding information about the index buffer
 
 	ComPtr<ID3D12Resource> depthStencilBuffer; // This is the memory for our depth buffer. it will also be used for a stencil buffer in a later tutorial
 	ComPtr<ID3D12DescriptorHeap> dsDescriptorHeap; // This is a heap for our depth/stencil buffer descriptor
@@ -86,8 +83,6 @@ private:
 	XMFLOAT4X4 cube2WorldMat; // our first cubes world matrix (transformation matrix)
 	XMFLOAT4X4 cube2RotMat; // this will keep track of our rotation for the second cube
 	XMFLOAT4 cube2PositionOffset; // our second cube will rotate around the first cube, so this is the position offset from the first cube
-
-	int numCubeIndices; // the number of indices to draw the cube
 
 #pragma endregion
 
