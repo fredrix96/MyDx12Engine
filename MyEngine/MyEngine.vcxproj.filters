@@ -51,9 +51,6 @@
     <ClInclude Include="commandManager.h">
       <Filter>DirectX12\Header files</Filter>
     </ClInclude>
-    <ClInclude Include="descriptor.h">
-      <Filter>DirectX12\Header files</Filter>
-    </ClInclude>
     <ClInclude Include="commandQueueManager.h">
       <Filter>DirectX12\Header files</Filter>
     </ClInclude>
@@ -96,6 +93,15 @@
     <ClInclude Include="indexBuffer.h">
       <Filter>DirectX12\Header files</Filter>
     </ClInclude>
+    <ClInclude Include="depthBuffer.h">
+      <Filter>DirectX12\Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="renderTargetView.h">
+      <Filter>DirectX12\Header files</Filter>
+    </ClInclude>
+    <ClInclude Include="descriptorHeap.h">
+      <Filter>DirectX12\Header files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="windowManager.cpp">
@@ -114,9 +120,6 @@
       <Filter>DirectX12\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="commandQueueManager.cpp">
-      <Filter>DirectX12\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="descriptor.cpp">
       <Filter>DirectX12\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="deviceManager.cpp">
@@ -146,17 +149,26 @@
     <ClCompile Include="swapChainManager.cpp">
       <Filter>DirectX12\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="GPUResource.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="vertexBuffer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="direct3DContextManager.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>DirectX12\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="indexBuffer.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>DirectX12\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GPUResource.cpp">
+      <Filter>DirectX12\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="direct3DContextManager.cpp">
+      <Filter>DirectX12\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="depthBuffer.cpp">
+      <Filter>DirectX12\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="renderTargetView.cpp">
+      <Filter>DirectX12\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="descriptorHeap.cpp">
+      <Filter>DirectX12\Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -224,40 +224,10 @@ bool Dx12Engine::Initialize()
 		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 
 
-	// Create the depth/stencil buffer
+	// -- Create the Depth/Stencil Buffer -- //
 
-	// create a depth stencil descriptor heap so we can get a pointer to the depth stencil buffer
-	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
-	dsvHeapDesc.NumDescriptors = 1;
-	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	HRESULT hr = mDevMan.GetDevice()->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&dsDescriptorHeap));
-	if (FAILED(hr))
-	{
-		gWindowRunning = false;
-	}
-
-	D3D12_DEPTH_STENCIL_VIEW_DESC depthStencilDesc = {};
-	depthStencilDesc.Format = DXGI_FORMAT_D32_FLOAT;
-	depthStencilDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-	depthStencilDesc.Flags = D3D12_DSV_FLAG_NONE;
-
-	D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
-	depthOptimizedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
-	depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
-	depthOptimizedClearValue.DepthStencil.Stencil = 0;
-
-	mDevMan.GetDevice()->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, mMainWindow.GetWidth(), mMainWindow.GetHeight(), 1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL),
-		D3D12_RESOURCE_STATE_DEPTH_WRITE,
-		&depthOptimizedClearValue,
-		IID_PPV_ARGS(&depthStencilBuffer)
-	);
-	dsDescriptorHeap->SetName(L"Depth/Stencil Resource Heap");
-
-	mDevMan.GetDevice()->CreateDepthStencilView(depthStencilBuffer.Get(), &depthStencilDesc, dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+	isCreated = mDescMan.CreateDepthBuffer(mDevMan.GetDevice().Get(), mMainWindow.GetWidth(), mMainWindow.GetHeight(), first);
+	ASSERT(isCreated);
 
 	// create the constant buffer resource heap
 	// We will update the constant buffer one or more times per frame, so we will use only an upload heap
@@ -273,6 +243,7 @@ bool Dx12Engine::Initialize()
 	// 16 floats in one constant buffer, and we will store 2 constant buffers in each
 	// heap, one for each cube, thats only 64x2 bits, or 128 bits we are using for each
 	// resource, and each resource must be at least 64KB (65536 bits)
+	HRESULT hr;
 	for (int i = 0; i < NUM_OF_FRAME_BUFFERS; ++i)
 	{
 		// create resource for cube 1
@@ -389,8 +360,7 @@ void Dx12Engine::UpdatePipeline()
 	// the second parameter to NULL
 	hr = mComMan.GetCommand(first).GetCommandList()->Reset(
 		mComMan.GetCommand(first).GetCommandAllocator(frameIndex).Get(),
-		mGraphPipeMan.GetPSO(first).GetPSO().Get()
-	);
+		mGraphPipeMan.GetPSO(first).GetPSO().Get());
 	if (FAILED(hr))
 	{
 		gWindowRunning = false;
@@ -408,7 +378,7 @@ void Dx12Engine::UpdatePipeline()
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle = mDescMan.GetRTVDescriptor(first).GetHandle(frameIndex);
 
 	// get a handle to the depth/stencil buffer
-	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle = mDescMan.GetDepthBuffer(first).GetHandle();
 
 	// set the render target for the output merger stage (the output of the pipeline)
 	mComMan.GetCommand(first).GetCommandList()->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
@@ -418,7 +388,7 @@ void Dx12Engine::UpdatePipeline()
 	mComMan.GetCommand(first).GetCommandList()->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
 	// clear the depth/stencil buffer
-	mComMan.GetCommand(first).GetCommandList()->ClearDepthStencilView(dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+	mComMan.GetCommand(first).GetCommandList()->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 	// set root signature
 	mComMan.GetCommand(first).GetCommandList()->SetGraphicsRootSignature(mRootSignMan.GetRootSignature(first).GetRootSignature().Get()); // set the root signature

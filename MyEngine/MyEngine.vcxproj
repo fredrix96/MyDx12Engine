@@ -146,12 +146,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="depthBuffer.h" />
+    <ClInclude Include="descriptorHeap.h" />
     <ClInclude Include="direct3DContextManager.h" />
     <ClInclude Include="command.h" />
     <ClInclude Include="commandManager.h" />
     <ClInclude Include="commandQueueManager.h" />
     <ClInclude Include="d3dx12.h" />
-    <ClInclude Include="descriptor.h" />
+    <ClInclude Include="renderTargetView.h" />
     <ClInclude Include="descriptorManager.h" />
     <ClInclude Include="deviceManager.h" />
     <ClInclude Include="dx.h" />
@@ -173,7 +175,9 @@
     <ClCompile Include="command.cpp" />
     <ClCompile Include="commandManager.cpp" />
     <ClCompile Include="commandQueueManager.cpp" />
-    <ClCompile Include="descriptor.cpp" />
+    <ClCompile Include="depthBuffer.cpp" />
+    <ClCompile Include="descriptorHeap.cpp" />
+    <ClCompile Include="renderTargetView.cpp" />
     <ClCompile Include="descriptorManager.cpp" />
     <ClCompile Include="deviceManager.cpp" />
     <ClCompile Include="direct3DContextManager.cpp" />
