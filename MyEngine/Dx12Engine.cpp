@@ -73,6 +73,12 @@ bool Dx12Engine::Initialize()
 	isCreated = mDescMan.CreateRTVDescriptorHeap(mDevMan.GetDevice().Get(), mSwapChainMan.GetSwapChain().Get(), first);
 	ASSERT(isCreated);
 
+	// -- Create the Depth/Stencil Buffer -- //
+
+	isCreated = mDescMan.CreateDepthBuffer(mDevMan.GetDevice().Get(), mMainWindow.GetWidth(), mMainWindow.GetHeight(), first);
+	ASSERT(isCreated);
+	if (!isCreated) gWindowRunning = false;
+
 	// -- Create the Command Allocators -- And -- Create a Command List --//
 
 	isCreated = mComMan.CreateCommand(mDevMan.GetDevice().Get(), frameIndex, first);
@@ -223,13 +229,7 @@ bool Dx12Engine::Initialize()
 		D3D12_RESOURCE_STATE_COPY_DEST,
 		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 
-
-	// -- Create the Depth/Stencil Buffer -- //
-
-	isCreated = mDescMan.CreateDepthBuffer(mDevMan.GetDevice().Get(), mMainWindow.GetWidth(), mMainWindow.GetHeight(), first);
-	ASSERT(isCreated);
-
-	// create the constant buffer resource heap
+	// -- Create Constant Buffer Resource Heap -- //
 	// We will update the constant buffer one or more times per frame, so we will use only an upload heap
 	// unlike previously we used an upload heap to upload the vertex and index data, and then copied over
 	// to a default heap. If you plan to use a resource for more than a couple frames, it is usually more
@@ -243,31 +243,9 @@ bool Dx12Engine::Initialize()
 	// 16 floats in one constant buffer, and we will store 2 constant buffers in each
 	// heap, one for each cube, thats only 64x2 bits, or 128 bits we are using for each
 	// resource, and each resource must be at least 64KB (65536 bits)
-	HRESULT hr;
-	for (int i = 0; i < NUM_OF_FRAME_BUFFERS; ++i)
-	{
-		// create resource for cube 1
-		hr = mDevMan.GetDevice()->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), // this heap will be used to upload the constant buffer data
-			D3D12_HEAP_FLAG_NONE, // no flags
-			&CD3DX12_RESOURCE_DESC::Buffer(1024 * 64), // size of the resource heap. Must be a multiple of 64KB for single-textures and constant buffers
-			D3D12_RESOURCE_STATE_GENERIC_READ, // will be data that is read from so we keep it in the generic read state
-			nullptr, // we do not have use an optimized clear value for constant buffers
-			IID_PPV_ARGS(&constantBufferUploadHeaps[i]));
-		constantBufferUploadHeaps[i]->SetName(L"Constant Buffer Upload Resource Heap");
 
-		ZeroMemory(&cbPerObject, sizeof(cbPerObject));
-
-		CD3DX12_RANGE readRange(0, 0);	// We do not intend to read from this resource on the CPU. (so end is less than or equal to begin)
-
-		// map the resource heap to get a gpu virtual address to the beginning of the heap
-		hr = constantBufferUploadHeaps[i]->Map(0, &readRange, reinterpret_cast<void**>(&cbvGPUAddress[i]));
-
-		// Because of the constant read alignment requirements, constant buffer views must be 256 bit aligned. Our buffers are smaller than 256 bits,
-		// so we need to add spacing between the two buffers, so that the second buffer starts at 256 bits from the beginning of the resource heap.
-		memcpy(cbvGPUAddress[i], &cbPerObject, sizeof(cbPerObject)); // cube1's constant buffer data
-		memcpy(cbvGPUAddress[i] + ConstantBufferPerObjectAlignedSize, &cbPerObject, sizeof(cbPerObject)); // cube2's constant buffer data
-	}
+	isCreated = mD3DContextMan.CreateConstantBuffers(mDevMan.GetDevice().Get(), first);
+	ASSERT(isCreated);
 
 	// Now we execute the command list to upload the initial assets (triangle data)
 	mComMan.GetCommand(first).GetCommandList()->Close();
@@ -276,11 +254,13 @@ bool Dx12Engine::Initialize()
 
 	// increment the fence value now, otherwise the buffer might not be uploaded by the time we start drawing
 	mFenceMan.IncrementFenceValue(frameIndex);
-	hr = mComQueMan.GetDirectCommandQueue()->Signal(mFenceMan.GetFence(frameIndex).Get(), mFenceMan.GetFenceValue(frameIndex));
+	HRESULT hr = mComQueMan.GetDirectCommandQueue()->Signal(mFenceMan.GetFence(frameIndex).Get(), mFenceMan.GetFenceValue(frameIndex));
 	if (FAILED(hr))
 	{
 		gWindowRunning = false;
 	}
+
+	// -- Camera Set Up -- //
 
 	// Fill out the Viewport
 	viewport.TopLeftX = 0;
@@ -311,6 +291,8 @@ bool Dx12Engine::Initialize()
 	XMVECTOR cUp = XMLoadFloat4(&cameraUp);
 	tmpMat = XMMatrixLookAtLH(cPos, cTarg, cUp);
 	XMStoreFloat4x4(&cameraViewMat, tmpMat);
+
+	// -- Object Placement -- //
 
 	// set starting cubes position
 	// first cube
@@ -403,7 +385,8 @@ void Dx12Engine::UpdatePipeline()
 	// first cube
 
 	// set cube1's constant buffer
-	mComMan.GetCommand(first).GetCommandList()->SetGraphicsRootConstantBufferView(0, constantBufferUploadHeaps[frameIndex]->GetGPUVirtualAddress());
+	mComMan.GetCommand(first).GetCommandList()->SetGraphicsRootConstantBufferView(0,
+		mD3DContextMan.GetConstantBuffer(first).GetBufferResource(frameIndex)->GetGPUVirtualAddress());
 
 	// draw first cube
 	mComMan.GetCommand(first).GetCommandList()->DrawIndexedInstanced(mD3DContextMan.GetIndexBuffer(first).GetNumOfIndices(), 1, 0, 0, 0);
@@ -414,7 +397,7 @@ void Dx12Engine::UpdatePipeline()
 	// resource heaps address. This is because cube1's constant buffer is stored at the beginning of the resource heap, while
 	// cube2's constant buffer data is stored after (256 bits from the start of the heap).
 	mComMan.GetCommand(first).GetCommandList()->SetGraphicsRootConstantBufferView(0,
-		constantBufferUploadHeaps[frameIndex]->GetGPUVirtualAddress() + ConstantBufferPerObjectAlignedSize);
+		mD3DContextMan.GetConstantBuffer(first).GetBufferResource(frameIndex)->GetGPUVirtualAddress() + ConstantBufferPerObjectAlignedSize);
 
 	// draw second cube
 	mComMan.GetCommand(first).GetCommandList()->DrawIndexedInstanced(mD3DContextMan.GetIndexBuffer(first).GetNumOfIndices(), 1, 0, 0, 0);
@@ -538,10 +521,13 @@ void Dx12Engine::UpdateGameLogic()
 	XMMATRIX projMat = XMLoadFloat4x4(&cameraProjMat); // load projection matrix
 	XMMATRIX wvpMat = XMLoadFloat4x4(&cube1WorldMat) * viewMat * projMat; // create wvp matrix
 	XMMATRIX transposed = XMMatrixTranspose(wvpMat); // must transpose wvp matrix for the gpu
-	XMStoreFloat4x4(&cbPerObject.wvpMat, transposed); // store transposed wvp matrix in constant buffer
+	mD3DContextMan.GetConstantBuffer(first).StoreValues(transposed);  // store transposed wvp matrix in constant buffer
 
 	// copy our ConstantBuffer instance to the mapped constant buffer resource
-	memcpy(cbvGPUAddress[frameIndex], &cbPerObject, sizeof(cbPerObject));
+	memcpy(mD3DContextMan.GetConstantBuffer(first).GetCBVGPUAddress(frameIndex),
+		mD3DContextMan.GetConstantBuffer(first).GetCBPerObject(),
+		sizeof(mD3DContextMan.GetConstantBuffer(first).GetCBPerObject()));
+	int size = sizeof(mD3DContextMan.GetConstantBuffer(first).GetCBPerObject());
 
 	// now do cube2's world matrix
 	// create rotation matrices for cube2
@@ -568,10 +554,12 @@ void Dx12Engine::UpdateGameLogic()
 
 	wvpMat = XMLoadFloat4x4(&cube2WorldMat) * viewMat * projMat; // create wvp matrix
 	transposed = XMMatrixTranspose(wvpMat); // must transpose wvp matrix for the gpu
-	XMStoreFloat4x4(&cbPerObject.wvpMat, transposed); // store transposed wvp matrix in constant buffer
+	mD3DContextMan.GetConstantBuffer(first).StoreValues(transposed); // store transposed wvp matrix in constant buffer
 
 	// copy our ConstantBuffer instance to the mapped constant buffer resource
-	memcpy(cbvGPUAddress[frameIndex] + ConstantBufferPerObjectAlignedSize, &cbPerObject, sizeof(cbPerObject));
+	memcpy(mD3DContextMan.GetConstantBuffer(first).GetCBVGPUAddress(frameIndex) + ConstantBufferPerObjectAlignedSize, 
+		mD3DContextMan.GetConstantBuffer(first).GetCBPerObject(),
+		sizeof(mD3DContextMan.GetConstantBuffer(first).GetCBPerObject()));
 
 	// store cube2's world matrix
 	XMStoreFloat4x4(&cube2WorldMat, worldMat);

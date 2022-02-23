@@ -146,6 +146,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="constantBuffer.h" />
     <ClInclude Include="depthBuffer.h" />
     <ClInclude Include="descriptorHeap.h" />
     <ClInclude Include="direct3DContextManager.h" />
@@ -175,6 +176,7 @@
     <ClCompile Include="command.cpp" />
     <ClCompile Include="commandManager.cpp" />
     <ClCompile Include="commandQueueManager.cpp" />
+    <ClCompile Include="constantBuffer.cpp" />
     <ClCompile Include="depthBuffer.cpp" />
     <ClCompile Include="descriptorHeap.cpp" />
     <ClCompile Include="renderTargetView.cpp" />

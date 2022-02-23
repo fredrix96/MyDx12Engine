@@ -102,6 +102,9 @@
     <ClInclude Include="descriptorHeap.h">
       <Filter>DirectX12\Header files</Filter>
     </ClInclude>
+    <ClInclude Include="constantBuffer.h">
+      <Filter>DirectX12\Header files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="windowManager.cpp">
@@ -168,6 +171,9 @@
       <Filter>DirectX12\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="descriptorHeap.cpp">
+      <Filter>DirectX12\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="constantBuffer.cpp">
       <Filter>DirectX12\Source Files</Filter>
     </ClCompile>
   </ItemGroup>

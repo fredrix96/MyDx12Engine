@@ -121,6 +121,57 @@ bool Direct3DContextManager::CreateIndexBuffer(ID3D12Device* device, std::pair<D
     return true;
 }
 
+bool Direct3DContextManager::CreateConstantBuffers(ID3D12Device* device, std::wstring name)
+{
+    UINT8* cbvGPUAddress[NUM_OF_FRAME_BUFFERS];    
+    ID3D12Resource* constantBufferUploadHeaps[NUM_OF_FRAME_BUFFERS];
+    ConstantBufferPerObject cbPerObject;
+    cbPerObject.wvpMat = XMFLOAT4X4();
+
+    std::wstring tmpName;
+    for (int i = 0; i < NUM_OF_FRAME_BUFFERS; ++i)
+    {
+        // create resource for cube 1
+        mHr = device->CreateCommittedResource(
+            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), // this heap will be used to upload the constant buffer data
+            D3D12_HEAP_FLAG_NONE, // no flags
+            &CD3DX12_RESOURCE_DESC::Buffer(1024 * 64), // size of the resource heap. Must be a multiple of 64KB for single-textures and constant buffers
+            D3D12_RESOURCE_STATE_GENERIC_READ, // will be data that is read from so we keep it in the generic read state
+            nullptr, // we do not have to use an optimized clear value for constant buffers
+            IID_PPV_ARGS(&constantBufferUploadHeaps[i]));
+        if (FAILED(mHr))
+        {
+            ASSERT(false);
+            break;
+        }
+        tmpName = L"constantBufferUploadHeap_" + name + L"_" + std::to_wstring(i);
+        constantBufferUploadHeaps[i]->SetName(tmpName.c_str());
+
+        ZeroMemory(&cbPerObject, sizeof(cbPerObject));
+
+        CD3DX12_RANGE readRange(0, 0);	// We do not intend to read from this resource on the CPU. (so end is less than or equal to begin)
+
+        // map the resource heap to get a gpu virtual address to the beginning of the heap
+        mHr = constantBufferUploadHeaps[i]->Map(0, &readRange, reinterpret_cast<void**>(&cbvGPUAddress[i]));
+        if (FAILED(mHr))
+        {
+            ASSERT(false);
+            break;
+        }
+
+        // Because of the constant read alignment requirements, constant buffer views must be 256 bit aligned. Our buffers are smaller than 256 bits,
+        // so we need to add spacing between the two buffers, so that the second buffer starts at 256 bits from the beginning of the resource heap.
+        memcpy(cbvGPUAddress[i], &cbPerObject, sizeof(cbPerObject)); // cube1's constant buffer data
+        memcpy(cbvGPUAddress[i] + ConstantBufferPerObjectAlignedSize, &cbPerObject, sizeof(cbPerObject)); // cube2's constant buffer data
+    }
+
+    ConstantBuffer tmpBuffer(constantBufferUploadHeaps, &cbPerObject, cbvGPUAddress, name);
+
+    mConstantBufferMap.emplace(name, tmpBuffer);
+
+    return true;
+}
+
 VertexBuffer Direct3DContextManager::GetVertexBuffer(std::wstring name) const
 {
     return mVertexBufferMap.at(name);
@@ -129,4 +180,9 @@ VertexBuffer Direct3DContextManager::GetVertexBuffer(std::wstring name) const
 IndexBuffer Direct3DContextManager::GetIndexBuffer(std::wstring name) const
 {
     return mIndexBufferMap.at(name);
+}
+
+ConstantBuffer Direct3DContextManager::GetConstantBuffer(std::wstring name) const
+{
+    return mConstantBufferMap.at(name);
 }
