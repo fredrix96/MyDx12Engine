@@ -22,18 +22,19 @@ class ConstantBuffer
 {
 private:
     ComPtr<ID3D12Resource> mConstantBufferUploadHeaps[NUM_OF_FRAME_BUFFERS]; // this is the memory on the gpu where constant buffers for each frame will be placed
-    ConstantBufferPerObject* mCBPerObject; // this is the constant buffer data we will send to the gpu 
+    ConstantBufferPerObject mCBPerObject; // this is the constant buffer data we will send to the gpu 
                                             // (which will be placed in the resources above)
     UINT8* mCBVGPUAddress[NUM_OF_FRAME_BUFFERS]; // this is a pointer to each of the constant buffer resource heaps
 
     std::wstring mName;
 
 public:
-    ConstantBuffer(ID3D12Resource* constantBufferUploadHeaps[NUM_OF_FRAME_BUFFERS], ConstantBufferPerObject* cbPerObject, UINT8* cbvGPUAddres[], std::wstring name);
+    ConstantBuffer(ID3D12Resource* constantBufferUploadHeaps[NUM_OF_FRAME_BUFFERS], ConstantBufferPerObject cbPerObject, UINT8* cbvGPUAddres[], std::wstring name);
     ~ConstantBuffer();
 
     ComPtr<ID3D12Resource> GetBufferResource(int pos) const;
-    ConstantBufferPerObject* GetCBPerObject() const;
+    D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress(int pos) const;
+    ConstantBufferPerObject & GetCBPerObject();
     UINT8* GetCBVGPUAddress(int pos) const;
 
     void StoreValues(XMMATRIX matIn);

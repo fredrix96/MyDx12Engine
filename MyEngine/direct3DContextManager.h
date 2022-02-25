@@ -23,5 +23,5 @@ public:
 
 	VertexBuffer GetVertexBuffer(std::wstring name) const;
 	IndexBuffer GetIndexBuffer(std::wstring name) const;
-	ConstantBuffer GetConstantBuffer(std::wstring name) const;
+	ConstantBuffer & GetConstantBuffer(std::wstring name);
 };

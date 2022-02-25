@@ -164,8 +164,8 @@ bool Direct3DContextManager::CreateConstantBuffers(ID3D12Device* device, std::ws
         memcpy(cbvGPUAddress[i], &cbPerObject, sizeof(cbPerObject)); // cube1's constant buffer data
         memcpy(cbvGPUAddress[i] + ConstantBufferPerObjectAlignedSize, &cbPerObject, sizeof(cbPerObject)); // cube2's constant buffer data
     }
-
-    ConstantBuffer tmpBuffer(constantBufferUploadHeaps, &cbPerObject, cbvGPUAddress, name);
+    cbPerObject.wvpMat._11 = 3.0f;
+    ConstantBuffer tmpBuffer(constantBufferUploadHeaps, cbPerObject, cbvGPUAddress, name);
 
     mConstantBufferMap.emplace(name, tmpBuffer);
 
@@ -182,7 +182,7 @@ IndexBuffer Direct3DContextManager::GetIndexBuffer(std::wstring name) const
     return mIndexBufferMap.at(name);
 }
 
-ConstantBuffer Direct3DContextManager::GetConstantBuffer(std::wstring name) const
+ConstantBuffer & Direct3DContextManager::GetConstantBuffer(std::wstring name)
 {
     return mConstantBufferMap.at(name);
 }

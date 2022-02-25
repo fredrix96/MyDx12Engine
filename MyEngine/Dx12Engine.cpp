@@ -383,10 +383,9 @@ void Dx12Engine::UpdatePipeline()
 	mComMan.GetCommand(first).GetCommandList()->IASetIndexBuffer(&mD3DContextMan.GetIndexBuffer(first).GetIndexBufferView());
 
 	// first cube
-
 	// set cube1's constant buffer
 	mComMan.GetCommand(first).GetCommandList()->SetGraphicsRootConstantBufferView(0,
-		mD3DContextMan.GetConstantBuffer(first).GetBufferResource(frameIndex)->GetGPUVirtualAddress());
+		mD3DContextMan.GetConstantBuffer(first).GetGPUVirtualAddress(frameIndex));
 
 	// draw first cube
 	mComMan.GetCommand(first).GetCommandList()->DrawIndexedInstanced(mD3DContextMan.GetIndexBuffer(first).GetNumOfIndices(), 1, 0, 0, 0);
@@ -397,7 +396,7 @@ void Dx12Engine::UpdatePipeline()
 	// resource heaps address. This is because cube1's constant buffer is stored at the beginning of the resource heap, while
 	// cube2's constant buffer data is stored after (256 bits from the start of the heap).
 	mComMan.GetCommand(first).GetCommandList()->SetGraphicsRootConstantBufferView(0,
-		mD3DContextMan.GetConstantBuffer(first).GetBufferResource(frameIndex)->GetGPUVirtualAddress() + ConstantBufferPerObjectAlignedSize);
+		mD3DContextMan.GetConstantBuffer(first).GetGPUVirtualAddress(frameIndex) + ConstantBufferPerObjectAlignedSize);
 
 	// draw second cube
 	mComMan.GetCommand(first).GetCommandList()->DrawIndexedInstanced(mD3DContextMan.GetIndexBuffer(first).GetNumOfIndices(), 1, 0, 0, 0);
@@ -525,9 +524,8 @@ void Dx12Engine::UpdateGameLogic()
 
 	// copy our ConstantBuffer instance to the mapped constant buffer resource
 	memcpy(mD3DContextMan.GetConstantBuffer(first).GetCBVGPUAddress(frameIndex),
-		mD3DContextMan.GetConstantBuffer(first).GetCBPerObject(),
+		&mD3DContextMan.GetConstantBuffer(first).GetCBPerObject(),
 		sizeof(mD3DContextMan.GetConstantBuffer(first).GetCBPerObject()));
-	int size = sizeof(mD3DContextMan.GetConstantBuffer(first).GetCBPerObject());
 
 	// now do cube2's world matrix
 	// create rotation matrices for cube2
@@ -558,7 +556,7 @@ void Dx12Engine::UpdateGameLogic()
 
 	// copy our ConstantBuffer instance to the mapped constant buffer resource
 	memcpy(mD3DContextMan.GetConstantBuffer(first).GetCBVGPUAddress(frameIndex) + ConstantBufferPerObjectAlignedSize, 
-		mD3DContextMan.GetConstantBuffer(first).GetCBPerObject(),
+		&mD3DContextMan.GetConstantBuffer(first).GetCBPerObject(),
 		sizeof(mD3DContextMan.GetConstantBuffer(first).GetCBPerObject()));
 
 	// store cube2's world matrix
