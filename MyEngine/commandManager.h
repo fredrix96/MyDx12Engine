@@ -15,5 +15,5 @@ public:
 
 	bool CreateCommand(ID3D12Device* device, int frameIndex, std::wstring name);
 
-	Command GetCommand(std::wstring name) const;
+	Command & GetCommand(std::wstring name);
 };

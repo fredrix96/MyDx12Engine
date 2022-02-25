@@ -33,7 +33,7 @@ public:
     ~ConstantBuffer();
 
     ComPtr<ID3D12Resource> GetBufferResource(int pos) const;
-    D3D12_GPU_VIRTUAL_ADDRESS GetGPUVirtualAddress(int pos) const;
+    const D3D12_GPU_VIRTUAL_ADDRESS & GetGPUVirtualAddress(int pos);
     ConstantBufferPerObject & GetCBPerObject();
     UINT8* GetCBVGPUAddress(int pos) const;
 

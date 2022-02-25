@@ -19,7 +19,7 @@ ComPtr<ID3D12Resource> ConstantBuffer::GetBufferResource(int pos) const
 	return mConstantBufferUploadHeaps[pos];
 }
 
-D3D12_GPU_VIRTUAL_ADDRESS ConstantBuffer::GetGPUVirtualAddress(int pos) const
+const D3D12_GPU_VIRTUAL_ADDRESS & ConstantBuffer::GetGPUVirtualAddress(int pos)
 {
 	return mConstantBufferUploadHeaps[pos].Get()->GetGPUVirtualAddress();
 }

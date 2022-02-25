@@ -21,7 +21,7 @@ bool RootSignatureManager::CreateRootSignature(ID3D12Device* device, std::wstrin
     return isCreated;
 }
 
-RootSignature RootSignatureManager::GetRootSignature(std::wstring name) const
+RootSignature & RootSignatureManager::GetRootSignature(std::wstring name)
 {
     return mRootSignatures.at(name);
 }

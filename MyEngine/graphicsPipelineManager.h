@@ -20,7 +20,7 @@ public:
 		std::pair<D3D12_INPUT_ELEMENT_DESC*, int> inputLayout,
 		std::wstring name);
 
-	std::map<SHADER_TYPE, Shader> GetGraphicsPipeline(std::wstring name) const;
+	std::map<SHADER_TYPE, Shader> & GetGraphicsPipeline(std::wstring name);
 
-	PipelineStateObject GetPSO(std::wstring name) const;
+	PipelineStateObject & GetPSO(std::wstring name);
 };

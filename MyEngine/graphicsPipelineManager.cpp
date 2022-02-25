@@ -74,12 +74,12 @@ bool GraphicsPipelineManager::CreatePSO(ID3D12Device* device,
 	return isCreated;
 }
 
-std::map<SHADER_TYPE, Shader> GraphicsPipelineManager::GetGraphicsPipeline(std::wstring name) const
+std::map<SHADER_TYPE, Shader> & GraphicsPipelineManager::GetGraphicsPipeline(std::wstring name)
 {
 	return mGraphicsPipelineMap.at(name);
 }
 
-PipelineStateObject GraphicsPipelineManager::GetPSO(std::wstring name) const
+PipelineStateObject & GraphicsPipelineManager::GetPSO(std::wstring name)
 {
 	return mPSOMap.at(name);
 }

@@ -5,7 +5,7 @@
 class VertexBuffer : public GPUResource
 {
 private:
-    D3D12_VERTEX_BUFFER_VIEW mVertexBufferView = {};
+    D3D12_VERTEX_BUFFER_VIEW mVertexBufferView;
     std::wstring mName;
 
     bool createVertexBufferView();
@@ -18,5 +18,5 @@ public:
         std::wstring name);
     ~VertexBuffer() override;
 
-    D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView();
+    D3D12_VERTEX_BUFFER_VIEW & GetVertexBufferView();
 };

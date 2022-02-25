@@ -119,11 +119,11 @@ bool DescriptorManager::CreateDepthBuffer(ID3D12Device* device, int windowWidth,
 	return true;
 }
 
-RenderTargetView DescriptorManager::GetRTVDescriptor(std::wstring name) const
+RenderTargetView & DescriptorManager::GetRTVDescriptor(std::wstring name)
 {
 	return mRTVMap.at(name);
 }
-DepthBuffer DescriptorManager::GetDepthBuffer(std::wstring name) const
+DepthBuffer & DescriptorManager::GetDepthBuffer(std::wstring name)
 {
 	return mDepthBufferMap.at(name);
 }

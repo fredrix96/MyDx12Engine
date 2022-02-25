@@ -18,5 +18,5 @@ public:
 
 	bool CreateShader(SHADER_TYPE type, std::wstring name);
 
-	D3D12_SHADER_BYTECODE GetShaderByteCode() const;
+	D3D12_SHADER_BYTECODE & GetShaderByteCode();
 };

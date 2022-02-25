@@ -26,7 +26,7 @@ bool CommandManager::CreateCommand(ID3D12Device* device, int frameIndex, std::ws
 	return isCreated;
 }
 
-Command CommandManager::GetCommand(std::wstring name) const
+Command & CommandManager::GetCommand(std::wstring name)
 {
 	return mCommands.at(name);
 }

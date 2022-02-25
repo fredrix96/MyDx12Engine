@@ -20,6 +20,6 @@ public:
         std::wstring name);
     ~IndexBuffer() override;
 
-    D3D12_INDEX_BUFFER_VIEW GetIndexBufferView();
+    D3D12_INDEX_BUFFER_VIEW & GetIndexBufferView();
     int GetNumOfIndices() const;
 };

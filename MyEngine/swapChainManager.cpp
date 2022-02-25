@@ -58,17 +58,17 @@ ComPtr<IDXGISwapChain3> SwapChainManager::GetSwapChain() const
 	return mSwapChain;
 }
 
-DXGI_MODE_DESC SwapChainManager::GetBackBufferDesc() const
+DXGI_MODE_DESC & SwapChainManager::GetBackBufferDesc()
 {
 	return mBackBufferDesc;
 }
 
-DXGI_SAMPLE_DESC SwapChainManager::GetSampleDesc() const
+DXGI_SAMPLE_DESC & SwapChainManager::GetSampleDesc()
 {
 	return mSampleDesc;
 }
 
-DXGI_SWAP_CHAIN_DESC SwapChainManager::GetSwapChainDesc() const
+DXGI_SWAP_CHAIN_DESC & SwapChainManager::GetSwapChainDesc()
 {
 	return mSwapChainDesc;
 }

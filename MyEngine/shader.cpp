@@ -60,7 +60,7 @@ bool Shader::CreateShader(SHADER_TYPE type, std::wstring name)
 	return true;
 }
 
-D3D12_SHADER_BYTECODE Shader::GetShaderByteCode() const
+D3D12_SHADER_BYTECODE & Shader::GetShaderByteCode()
 {
 	return mShaderBytecode;
 }

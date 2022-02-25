@@ -22,8 +22,9 @@ public:
 		IDXGIFactory4* device,
 		ID3D12CommandQueue* commandQueue,
 		int frameBufferCount);
+
 	ComPtr<IDXGISwapChain3> GetSwapChain() const;
-	DXGI_MODE_DESC GetBackBufferDesc() const;
-	DXGI_SAMPLE_DESC GetSampleDesc() const;
-	DXGI_SWAP_CHAIN_DESC GetSwapChainDesc() const;
+	DXGI_MODE_DESC & GetBackBufferDesc();
+	DXGI_SAMPLE_DESC & GetSampleDesc();
+	DXGI_SWAP_CHAIN_DESC & GetSwapChainDesc();
 };

@@ -72,7 +72,7 @@ public:
 
 	void EnableDebugLayer(); // enable debug layer
 
-	WindowManager GetMainWindow() const;
+	const WindowManager & GetMainWindow();
 
 	//tmp
 	void UpdateGameLogic();

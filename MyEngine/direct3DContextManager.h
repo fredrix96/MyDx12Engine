@@ -21,7 +21,7 @@ public:
 	bool CreateIndexBuffer(ID3D12Device* device, std::pair<DWORD*, int> indexData, ID3D12GraphicsCommandList* cmdList, std::wstring name);
 	bool CreateConstantBuffers(ID3D12Device* device, std::wstring name);
 
-	VertexBuffer GetVertexBuffer(std::wstring name) const;
-	IndexBuffer GetIndexBuffer(std::wstring name) const;
+	VertexBuffer & GetVertexBuffer(std::wstring name);
+	IndexBuffer & GetIndexBuffer(std::wstring name);
 	ConstantBuffer & GetConstantBuffer(std::wstring name);
 };

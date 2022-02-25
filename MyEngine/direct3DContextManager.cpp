@@ -172,12 +172,12 @@ bool Direct3DContextManager::CreateConstantBuffers(ID3D12Device* device, std::ws
     return true;
 }
 
-VertexBuffer Direct3DContextManager::GetVertexBuffer(std::wstring name) const
+VertexBuffer & Direct3DContextManager::GetVertexBuffer(std::wstring name)
 {
     return mVertexBufferMap.at(name);
 }
 
-IndexBuffer Direct3DContextManager::GetIndexBuffer(std::wstring name) const
+IndexBuffer & Direct3DContextManager::GetIndexBuffer(std::wstring name)
 {
     return mIndexBufferMap.at(name);
 }

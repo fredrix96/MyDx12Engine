@@ -48,12 +48,12 @@ ComPtr<ID3D12Fence> FenceManager::GetFence(int pos) const
 	return mFence[pos];
 }
 
-HANDLE FenceManager::GetFenceEvent() const
+HANDLE & FenceManager::GetFenceEvent()
 {
 	return mFenceEvent;
 }
 
-UINT64 FenceManager::GetFenceValue(int pos) const
+UINT64 & FenceManager::GetFenceValue(int pos)
 {
 	return mFenceValue[pos];
 }

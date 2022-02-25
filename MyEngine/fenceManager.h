@@ -20,6 +20,6 @@ public:
 	void IncrementFenceValue(int frameIndex);
 
 	ComPtr<ID3D12Fence> GetFence(int pos) const;
-	HANDLE GetFenceEvent() const;
-	UINT64 GetFenceValue(int pos) const;
+	HANDLE & GetFenceEvent();
+	UINT64 & GetFenceValue(int pos);
 };

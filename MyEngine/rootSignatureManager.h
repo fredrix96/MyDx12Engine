@@ -14,5 +14,5 @@ public:
 
 	bool CreateRootSignature(ID3D12Device* device, std::wstring name);
 
-	RootSignature GetRootSignature(std::wstring name) const;
+	RootSignature & GetRootSignature(std::wstring name);
 };

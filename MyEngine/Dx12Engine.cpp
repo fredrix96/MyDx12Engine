@@ -489,7 +489,7 @@ void Dx12Engine::EnableDebugLayer()
 #endif
 }
 
-WindowManager Dx12Engine::GetMainWindow() const
+const WindowManager & Dx12Engine::GetMainWindow()
 {
 	return mMainWindow;
 }

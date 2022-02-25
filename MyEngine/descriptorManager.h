@@ -18,6 +18,6 @@ public:
 	bool CreateRTVDescriptorHeap(ID3D12Device* device, IDXGISwapChain3* swapChain, std::wstring name);
 	bool CreateDepthBuffer(ID3D12Device* device, int windowWidth, int windowHeight, std::wstring name);
 
-	RenderTargetView GetRTVDescriptor(std::wstring name) const;
-	DepthBuffer GetDepthBuffer(std::wstring name) const;
+	RenderTargetView & GetRTVDescriptor(std::wstring name);
+	DepthBuffer & GetDepthBuffer(std::wstring name);
 };

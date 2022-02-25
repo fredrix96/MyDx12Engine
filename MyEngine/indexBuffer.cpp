@@ -27,7 +27,7 @@ bool IndexBuffer::createIndexBufferView()
 	return true;
 }
 
-D3D12_INDEX_BUFFER_VIEW IndexBuffer::GetIndexBufferView()
+D3D12_INDEX_BUFFER_VIEW & IndexBuffer::GetIndexBufferView()
 {
 	return mIndexBufferView;
 }
